@@ -472,7 +472,7 @@ const App = () => {
             <iframe src={activeWorkspace.url} title="Materials" className="w-full h-full" frameBorder="0" allowFullScreen />
           </div>
           <div className="w-1/2 bg-[#E9F1FC] relative">
-            <iframe src="/scratch/index.html" title="Scratch GUI" className="w-full h-full" frameBorder="0" allow="geolocation; microphone; camera; midi" />
+            <iframe src="/scratch/editor.html" title="Scratch GUI" className="w-full h-full" frameBorder="0" allow="geolocation; microphone; camera; midi" />
           </div>
         </div>
       </div>
