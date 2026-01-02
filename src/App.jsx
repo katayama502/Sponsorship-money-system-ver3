@@ -55,13 +55,13 @@ import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot, query, se
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
-  apiKey: "AIzaSyBHlI1bRnZaSTk3JAQR1P08OYWy7jagolU",
-  authDomain: "creatte-d650b.firebaseapp.com",
-  projectId: "creatte-d650b",
-  storageBucket: "creatte-d650b.firebasestorage.app",
-  messagingSenderId: "1076000286227",
-  appId: "1:1076000286227:web:95c8b418b9d0f22b2781e6",
-  measurementId: "G-1WYQP8SHG2"
+  apiKey: "AIzaSyArYfL-wE_F0OF3QNl5_jh_B7ZXr7Ev5fg",
+  authDomain: "creatte-sponser-app.firebaseapp.com",
+  projectId: "creatte-sponser-app",
+  storageBucket: "creatte-sponser-app.firebasestorage.app",
+  messagingSenderId: "753873131194",
+  appId: "1:753873131194:web:e8e73547f530509c7e1483",
+  measurementId: "G-2XXBZJDCXE"
 };
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
