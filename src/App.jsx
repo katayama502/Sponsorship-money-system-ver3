@@ -251,8 +251,8 @@ const App = () => {
       }
       setStudentForm({ name: '', school: '', age: '', courseId: 'premium', remarks: '', nextClassDate: '', studentLoginId: '', studentPassword: '', parentLoginId: '', parentPassword: '' });
       setEditingStudent(null);
-    } catch (e) { setSaveMessage('保存エラー'); }
-    setTimeout(() => setSaveMessage(''), 3000);
+    } catch (e) { console.error(e); setSaveMessage(`保存エラー: ${e.message}`); }
+    setTimeout(() => setSaveMessage(''), 5000);
   };
 
   const saveSponsor = async (e) => {
