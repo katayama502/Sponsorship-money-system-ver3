@@ -128,8 +128,31 @@ const App = () => {
   const [sponsorForm, setSponsorForm] = useState({ name: '', repName: '', email: '', amount: '' });
   const [editingSponsor, setEditingSponsor] = useState(null);
   const [activeWorkspace, setActiveWorkspace] = useState(null);
+  const [splitRatio, setSplitRatio] = useState(50);
+  const [isDragging, setIsDragging] = useState(false);
 
   // --- Firebase 認証 & リアルタイムリスナー ---
+  // --- Resizer Logic ---
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isDragging) return;
+      const newRatio = (e.clientX / window.innerWidth) * 100;
+      setSplitRatio(Math.min(90, Math.max(10, newRatio))); // Limit between 10% and 90%
+    };
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
+
   useEffect(() => {
     const initAuth = async () => {
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -455,6 +478,8 @@ const App = () => {
     );
   }
 
+
+
   if (activeWorkspace) {
     return (
       <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col text-left">
@@ -467,13 +492,37 @@ const App = () => {
             <X size={16} /> Close Workspace
           </button>
         </div>
-        <div className="flex-1 flex overflow-hidden">
-          <div className="w-1/2 border-r border-slate-800 bg-white relative">
-            <iframe src={activeWorkspace.url} title="Materials" className="w-full h-full" frameBorder="0" allowFullScreen />
+        <div className="flex-1 flex overflow-hidden relative select-none">
+          <div className="bg-white relative" style={{ width: `${splitRatio}%` }}>
+            <iframe
+              src={activeWorkspace.url}
+              title="Materials"
+              className={`w-full h-full ${isDragging ? 'pointer-events-none' : ''}`}
+              frameBorder="0"
+              allowFullScreen
+            />
           </div>
-          <div className="w-1/2 bg-[#E9F1FC] relative">
-            <iframe src="/scratch/editor.html" title="Scratch GUI" className="w-full h-full" frameBorder="0" allow="geolocation; microphone; camera; midi" />
+
+          {/* Resizer Handle */}
+          <div
+            className="w-4 bg-slate-800 hover:bg-orange-500 cursor-col-resize flex items-center justify-center shrink-0 transition-colors z-50"
+            onMouseDown={() => setIsDragging(true)}
+          >
+            <div className="w-1 h-8 bg-slate-600 rounded-full" />
           </div>
+
+          <div className="bg-[#E9F1FC] relative flex-1">
+            <iframe
+              src="/scratch/editor.html"
+              title="Scratch GUI"
+              className={`w-full h-full ${isDragging ? 'pointer-events-none' : ''}`}
+              frameBorder="0"
+              allow="geolocation; microphone; camera; midi"
+            />
+          </div>
+
+          {/* Overlay to catch events during drag */}
+          {isDragging && <div className="absolute inset-0 z-[100] cursor-col-resize" />}
         </div>
       </div>
     );
