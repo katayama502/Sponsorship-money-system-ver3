@@ -127,6 +127,7 @@ const App = () => {
   // --- 協賛企業フォーム状態 ---
   const [sponsorForm, setSponsorForm] = useState({ name: '', repName: '', email: '', amount: '' });
   const [editingSponsor, setEditingSponsor] = useState(null);
+  const [activeWorkspace, setActiveWorkspace] = useState(null);
 
   // --- Firebase 認証 & リアルタイムリスナー ---
   useEffect(() => {
@@ -343,6 +344,13 @@ const App = () => {
     setTimeout(() => setSaveMessage(''), 3000);
   };
 
+  const handleMaterialClick = (e, material) => {
+    if (material.tags.some(t => t.toLowerCase() === 'scratch')) {
+      e.preventDefault();
+      setActiveWorkspace(material);
+    }
+  };
+
   // --- サブコンポーネント: TrendChart ---
   const TrendChart = () => {
     if (historyRecords.length < 2) return <div className="h-32 flex items-center justify-center bg-slate-50 rounded-2xl border border-dashed text-xs text-slate-400">履歴データ不足</div>;
@@ -442,6 +450,30 @@ const App = () => {
             {authError && <p className="text-rose-500 text-[10px] font-bold text-center bg-rose-50 py-2 rounded-xl border border-rose-100">{authError}</p>}
             <button type="submit" className="w-full bg-orange-600 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-orange-700 transition-all active:scale-95 text-base">ログイン</button>
           </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeWorkspace) {
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col text-left">
+        <div className="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shrink-0 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="bg-orange-600 text-white px-3 py-1 rounded-lg text-xs font-black tracking-widest">WORKSTATION</div>
+            <h3 className="text-white font-bold text-lg truncate max-w-xl">{activeWorkspace.title}</h3>
+          </div>
+          <button onClick={() => setActiveWorkspace(null)} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest">
+            <X size={16} /> Close Workspace
+          </button>
+        </div>
+        <div className="flex-1 flex overflow-hidden">
+          <div className="w-1/2 border-r border-slate-800 bg-white relative">
+            <iframe src={activeWorkspace.url} title="Materials" className="w-full h-full" frameBorder="0" allowFullScreen />
+          </div>
+          <div className="w-1/2 bg-[#E9F1FC] relative">
+            <iframe src="/scratch/index.html" title="Scratch GUI" className="w-full h-full" frameBorder="0" allow="geolocation; microphone; camera; midi" />
+          </div>
         </div>
       </div>
     );
@@ -730,7 +762,7 @@ const App = () => {
             <header className="text-left"><h2 className="text-2xl font-black text-slate-800 tracking-tight text-left">教材・リソースライブラリ</h2></header>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
               {materials.map(m => (
-                <div key={m.id} className="bg-white p-6 rounded-[2rem] border border-slate-200 flex items-center group shadow-sm hover:shadow-md transition-all text-left"><div className="text-left"><h4 className="font-black text-slate-800 text-lg text-left">{m.title}</h4><div className="flex flex-wrap gap-2 mt-2 text-left">{m.tags.map(t => (<span key={t} className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase text-left tracking-widest">{t}</span>))}</div><a href={m.url} target="_blank" className="text-orange-600 text-xs font-black flex items-center gap-1 mt-4 text-left hover:underline uppercase tracking-tighter">View Material <LinkIcon size={12} /></a></div></div>
+                <div key={m.id} className="bg-white p-6 rounded-[2rem] border border-slate-200 flex items-center group shadow-sm hover:shadow-md transition-all text-left"><div className="text-left"><h4 className="font-black text-slate-800 text-lg text-left">{m.title}</h4><div className="flex flex-wrap gap-2 mt-2 text-left">{m.tags.map(t => (<span key={t} className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase text-left tracking-widest">{t}</span>))}</div><a href={m.url} target="_blank" onClick={(e) => handleMaterialClick(e, m)} className="text-orange-600 text-xs font-black flex items-center gap-1 mt-4 text-left hover:underline uppercase tracking-tighter cursor-pointer">View Material <LinkIcon size={12} /></a></div></div>
               ))}
               {materials.length === 0 && <div className="md:col-span-2 py-20 bg-white rounded-3xl border border-dashed border-slate-200 text-center text-slate-400 font-bold uppercase tracking-widest text-xs text-center">現在、公開されている教材はありません</div>}
             </div>
