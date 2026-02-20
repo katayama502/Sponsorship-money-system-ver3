@@ -18,10 +18,7 @@ import {
   RotateCcw,
   ShieldCheck,
   UserPlus,
-  PieChart,
-  BarChart3,
   History,
-  TrendingUp,
   Calendar,
   Trash2,
   Edit2,
@@ -90,20 +87,13 @@ const App = () => {
   const [authError, setAuthError] = useState('');
 
   // --- UI State ---
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [showReport, setShowReport] = useState(false);
+  const [activeTab, setActiveTab] = useState('students');
   const [saveMessage, setSaveMessage] = useState('');
 
   // --- Data State ---
-  const [costs, setCosts] = useState({ '家賃': 150000, '水道光熱費': 30000, '講師費用': 200000, '教材費': 50000, '備品費': 20000 });
-  const [bufferStudentTarget, setBufferStudentTarget] = useState(5);
-  const [historyRecords, setHistoryRecords] = useState([]);
   const [students, setStudents] = useState([]);
   const [learningRecords, setLearningRecords] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
-  const [sponsors, setSponsors] = useState([]);
-  const [recordMonth, setRecordMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [isRecording, setIsRecording] = useState(false);
 
   // --- Student Form State ---
   const [editingStudent, setEditingStudent] = useState(null);
@@ -122,11 +112,6 @@ const App = () => {
   const [materials, setMaterials] = useState([]);
   const [materialForm, setMaterialForm] = useState({ title: '', url: '', tags: '' });
   const [editingMaterial, setEditingMaterial] = useState(null);
-  const [selectedTag, setSelectedTag] = useState('All');
-
-  // --- 協賛企業フォーム状態 ---
-  const [sponsorForm, setSponsorForm] = useState({ name: '', repName: '', email: '', amount: '' });
-  const [editingSponsor, setEditingSponsor] = useState(null);
   const [activeWorkspace, setActiveWorkspace] = useState(null);
   const [splitRatio, setSplitRatio] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
@@ -170,9 +155,6 @@ const App = () => {
     if (!currentUser) return;
 
     // Firestoreの全データを同期
-    const unsubRecords = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'monthly_records'), (snap) => {
-      setHistoryRecords(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.month.localeCompare(b.month)));
-    });
     const unsubStudents = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'students'), (snap) => {
       setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -185,51 +167,21 @@ const App = () => {
     const unsubMaterials = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'materials'), (snap) => {
       setMaterials(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()));
     });
-    const unsubSponsors = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'sponsors'), (snap) => {
-      setSponsors(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
 
     return () => {
-      unsubRecords(); unsubStudents(); unsubAnnounce();
-      unsubLearning(); unsubMaterials(); unsubSponsors();
+      unsubStudents(); unsubAnnounce();
+      unsubLearning(); unsubMaterials();
     };
   }, [currentUser]);
 
-  // --- 計算ロジック ---
-  const sponsorship = useMemo(() => sponsors.reduce((acc, s) => acc + (Number(s.amount) || 0), 0), [sponsors]);
-
-  const studentCountsFromDb = useMemo(() => {
-    const counts = { premium: 0, standard: 0, basic: 0, entry: 0 };
-    students.forEach(s => { if (counts[s.courseId] !== undefined) counts[s.courseId]++; });
-    return counts;
-  }, [students]);
-
-  const totalOperatingCost = useMemo(() => Object.values(costs).reduce((acc, curr) => acc + curr, 0), [costs]);
-  const totalStudents = students.length;
-  const totalBaseRevenue = COURSE_BASES.reduce((acc, c) => acc + (c.price * (studentCountsFromDb[c.id] || 0)), 0);
-  const bufferAmount = bufferStudentTarget * COURSE_BASES[0].price;
-  const availableSurplus = (totalBaseRevenue + sponsorship) - (totalOperatingCost + bufferAmount);
-  const reductionPerStudent = totalStudents === 0 ? 0 : Math.max(0, Math.floor(availableSurplus / totalStudents / 1000) * 1000);
-  const coverageRate = Math.min(100, totalOperatingCost > 0 ? Math.round((sponsorship / totalOperatingCost) * 100) : 0);
-
-  const finalNetSurplus = availableSurplus - (reductionPerStudent * totalStudents);
-  const capacityPerCourse = useMemo(() => {
-    const pool = finalNetSurplus + bufferAmount;
-    return COURSE_BASES.map(course => ({
-      ...course,
-      count: Math.floor(pool / Math.max(1, course.price - reductionPerStudent))
-    }));
-  }, [finalNetSurplus, bufferAmount, reductionPerStudent]);
-
   // --- 各種ハンドラー ---
-  const handleCostChange = (key, value) => setCosts(prev => ({ ...prev, [key]: parseInt(value) || 0 }));
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
     if (loginId === 'admin' && password === 'admin123') {
       setCurrentUser({ role: 'admin', name: 'システム管理者' });
-      setActiveTab('dashboard');
+      setActiveTab('students');
       return;
     }
     const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'students'));
@@ -278,42 +230,12 @@ const App = () => {
     setTimeout(() => setSaveMessage(''), 5000);
   };
 
-  const saveSponsor = async (e) => {
-    e.preventDefault();
-    try {
-      const data = { ...sponsorForm, amount: Number(sponsorForm.amount) || 0, updatedAt: serverTimestamp() };
-      if (editingSponsor) {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sponsors', editingSponsor.id), data);
-      } else {
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'sponsors'), { ...data, createdAt: serverTimestamp() });
-      }
-      setSponsorForm({ name: '', repName: '', email: '', amount: '' });
-      setEditingSponsor(null);
-      setSaveMessage('保存しました');
-    } catch (e) { setSaveMessage('保存エラー'); }
-    setTimeout(() => setSaveMessage(''), 3000);
-  };
-
   const deleteSponsor = async (id) => {
     if (!window.confirm('この企業を削除しますか？')) return;
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sponsors', id));
       setSaveMessage('削除しました');
     } catch (e) { setSaveMessage('失敗'); }
-  };
-
-  const recordMonthlyStatus = async () => {
-    setIsRecording(true);
-    try {
-      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'monthly_records', recordMonth);
-      await setDoc(docRef, {
-        month: recordMonth, costs, sponsorship, bufferStudentTarget,
-        totalCost: totalOperatingCost, studentCounts: studentCountsFromDb,
-        totalStudents, reductionAmount: reductionPerStudent, recordedAt: serverTimestamp()
-      });
-      setSaveMessage('月次データを保存しました');
-    } catch (e) { setSaveMessage('エラー'); }
-    finally { setIsRecording(false); }
   };
 
   const saveMaterial = async (e) => {
@@ -373,87 +295,6 @@ const App = () => {
       setActiveWorkspace(material);
     }
   };
-
-  // --- サブコンポーネント: TrendChart ---
-  const TrendChart = () => {
-    if (historyRecords.length < 2) return <div className="h-32 flex items-center justify-center bg-slate-50 rounded-2xl border border-dashed text-xs text-slate-400">履歴データ不足</div>;
-    const maxVal = Math.max(...historyRecords.map(r => Math.max(r.totalCost || 0, r.sponsorship || 0))) * 1.2;
-    const points = (valKey) => historyRecords.map((r, i) => `${(i / (historyRecords.length - 1)) * 100},${100 - ((r[valKey] || 0) / maxVal) * 100}`).join(' ');
-    return (
-      <div className="w-full bg-slate-900 rounded-3xl p-6 text-white shadow-xl relative mb-6">
-        <div className="flex justify-between items-center mb-4 text-[10px] font-bold tracking-widest uppercase">
-          <div className="flex items-center gap-2 text-orange-400 tracking-[0.2em]"><TrendingUp size={14} /> ANALYTICS</div>
-          <div className="flex gap-4">
-            <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-orange-500"></div> 協賛</span>
-            <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-400"></div> 運営</span>
-          </div>
-        </div>
-        <svg viewBox="0 0 100 100" className="w-full h-32 md:h-24 overflow-visible" preserveAspectRatio="none">
-          <polyline fill="none" stroke="#64748b" strokeWidth="1" points={points('totalCost')} />
-          <polyline fill="none" stroke="#f97316" strokeWidth="2" points={points('sponsorship')} />
-        </svg>
-      </div>
-    );
-  };
-
-  // --- 報告書PDFプレビューモーダル ---
-  const ReportModal = () => (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 print:p-0 print:bg-white print:static text-left overflow-y-auto">
-      <div className="bg-white w-full h-full md:h-auto md:max-w-5xl md:max-h-[95vh] overflow-y-auto md:rounded-3xl shadow-2xl print:shadow-none print:max-h-full print:rounded-none text-left">
-        <div className="p-4 md:p-6 border-b flex justify-between items-center bg-slate-50 sticky top-0 z-20 print:hidden">
-          <div className="flex items-center gap-2 font-bold text-slate-700 text-left"><FileText className="text-orange-600 w-5 h-5" /> 報告書プレビュー</div>
-          <div className="flex gap-2 text-left">
-            <button onClick={() => window.print()} className="bg-orange-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-orange-700 shadow-lg text-xs md:text-sm font-bold transition-all"><Printer size={18} /> PDF出力</button>
-            <button onClick={() => setShowReport(false)} className="bg-white border border-slate-200 p-2 rounded-xl text-slate-500 hover:bg-slate-50 transition-all"><X size={20} /></button>
-          </div>
-        </div>
-        <div className="p-8 md:p-16 print:p-10 space-y-12 text-slate-800 bg-white text-left">
-          <div className="flex flex-col md:flex-row justify-between items-start gap-6 text-left">
-            <div className="space-y-2 text-left">
-              <div className="bg-orange-600 text-white px-3 py-1 text-[10px] font-bold tracking-[0.3em] inline-block rounded-sm">CONFIDENTIAL</div>
-              <h2 className="text-3xl md:text-4xl font-black tracking-tighter text-left">協賛活動成果報告書</h2>
-              <p className="text-slate-500 font-medium text-left">教育支援を通じた社会貢献と提供インパクトの可視化</p>
-            </div>
-            <div className="text-left md:text-right border-l-2 md:border-l-0 md:border-r-2 border-orange-500 pl-4 md:pr-4">
-              <p className="text-xs font-bold text-slate-400 text-left md:text-right">発行元</p>
-              <p className="text-sm font-black text-slate-800 text-left md:text-right uppercase">Clayette Project</p>
-            </div>
-          </div>
-          <section className="grid grid-cols-1 md:grid-cols-4 gap-6 text-left">
-            <div className="md:col-span-1 bg-orange-600 p-8 rounded-[2rem] text-white flex flex-col items-center justify-center text-center">
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-4 opacity-80">Coverage Rate</p>
-              <div className="relative w-32 h-32 mx-auto">
-                <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-                  <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="3" />
-                  <circle cx="18" cy="18" r="16" fill="none" stroke="white" strokeWidth="3" strokeDasharray={`${coverageRate} 100`} strokeLinecap="round" />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center font-black text-3xl">{coverageRate}%</div>
-              </div>
-            </div>
-            <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
-              <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 text-left"><p className="text-xs font-bold text-slate-400 mb-2 uppercase text-left">Total Sponsorship</p><p className="text-4xl font-black text-slate-900 tracking-tighter text-left">¥{sponsorship.toLocaleString()}</p></div>
-              <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 text-left"><p className="text-xs font-bold text-slate-400 mb-2 uppercase text-left">Benefit per child</p><p className="text-4xl font-black text-orange-600 tracking-tighter text-left">¥{reductionPerStudent.toLocaleString()}</p></div>
-            </div>
-          </section>
-          <section className="text-left space-y-6">
-            <div className="flex items-center gap-2 font-bold text-xl border-l-4 border-orange-500 pl-4 text-left">資金使途の詳細</div>
-            <div className="bg-slate-50 p-8 rounded-[2rem] space-y-6 text-left">
-              {Object.entries(costs).map(([key, value]) => {
-                const categoryWeight = totalOperatingCost > 0 ? value / totalOperatingCost : 0;
-                const coverRatio = Math.min(100, value > 0 ? Math.round((sponsorship * categoryWeight / value) * 100) : 0);
-                return (
-                  <div key={key} className="text-left">
-                    <div className="flex justify-between text-xs font-bold text-slate-600 mb-2 text-left"><span>{key}</span><span>寄与率: {coverRatio}%</span></div>
-                    <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden text-left"><div className="h-full bg-orange-500 transition-all duration-1000" style={{ width: `${coverRatio}%` }} /></div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        </div>
-      </div>
-    </div>
-  );
 
   // --- ログイン画面 ---
   if (!currentUser || !currentUser.role) {
@@ -541,9 +382,7 @@ const App = () => {
             <div className="flex gap-1 bg-slate-100 p-1 rounded-xl text-left">
               {currentUser.role === 'admin' ? (
                 <>
-                  <button onClick={() => setActiveTab('dashboard')} className={`px-2 md:px-4 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${activeTab === 'dashboard' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'}`}>分析</button>
                   <button onClick={() => setActiveTab('students')} className={`px-2 md:px-4 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${activeTab === 'students' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'}`}>生徒管理</button>
-                  <button onClick={() => setActiveTab('sponsors')} className={`px-2 md:px-4 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${activeTab === 'sponsors' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'}`}>協賛企業</button>
                   <button onClick={() => setActiveTab('materials')} className={`px-2 md:px-4 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${activeTab === 'materials' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'}`}>教材管理</button>
                   <button onClick={() => setActiveTab('notices')} className={`px-2 md:px-4 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${activeTab === 'notices' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'}`}>お知らせ</button>
                 </>
@@ -562,100 +401,6 @@ const App = () => {
       {/* メインエリア */}
       <main className="flex-grow max-w-6xl w-full mx-auto p-4 md:p-8 space-y-8 text-left text-slate-900 overflow-y-auto">
         {saveMessage && <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce text-left"><CheckCircle2 size={18} className="text-emerald-400" /><span className="text-sm font-bold">{saveMessage}</span></div>}
-
-        {/* 管理者: 分析・ダッシュボード */}
-        {currentUser.role === 'admin' && activeTab === 'dashboard' && (
-          <div className="space-y-8 animate-in fade-in duration-500 text-left">
-            <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-left">
-              <div className="text-left"><h2 className="text-2xl font-black tracking-tight text-left">受講料・協賛金分析</h2><p className="text-slate-400 text-sm font-medium text-left">運営コストと支援インパクトの統合ダッシュボード</p></div>
-              <div className="flex gap-2 text-left">
-                <button onClick={() => setShowReport(true)} className="bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 hover:scale-105 transition-all shadow-lg shadow-orange-100 text-sm"><FileText size={18} /> 報告書作成</button>
-                <div className="bg-white border border-slate-200 rounded-xl px-2 flex items-center gap-2 text-left"><input type="month" value={recordMonth} onChange={e => setRecordMonth(e.target.value)} className="py-2 text-xs font-bold outline-none bg-transparent" /><button onClick={recordMonthlyStatus} className="text-[10px] font-black text-orange-600 px-2 uppercase tracking-tighter">月次保存</button></div>
-              </div>
-            </header>
-
-            <TrendChart />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 text-left items-start">
-              {/* 左側設定パネル */}
-              <div className="space-y-6 text-left">
-                <div className="bg-white rounded-3xl border border-slate-200 p-6 space-y-4 text-left shadow-sm">
-                  <div className="flex items-center gap-2 font-bold text-slate-700 text-xs uppercase tracking-widest text-left"><Settings2 size={14} className="text-orange-500" /> 月間コスト</div>
-                  {Object.entries(costs).map(([key, value]) => (
-                    <div key={key} className="text-left"><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest text-left">{key}</label><input type="number" value={value} onChange={e => handleCostChange(key, e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500 transition-all" /></div>
-                  ))}
-                  <div className="pt-4 border-t border-dashed flex justify-between font-black text-left"><span className="text-xs text-slate-400 uppercase tracking-widest text-left">Total Cost</span><span className="text-orange-600 text-right">¥{totalOperatingCost.toLocaleString()}</span></div>
-                </div>
-                <div className="bg-orange-600 text-white rounded-3xl p-6 space-y-4 shadow-xl text-left">
-                  <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-widest opacity-80 text-left"><ShieldCheck size={14} /> 予備費バッファ設定</div>
-                  <p className="text-[10px] text-orange-100 font-medium text-left leading-relaxed">月4回コース(¥12,000)の生徒何人分の資金を、還元原資から除外して予備費に回しますか？</p>
-                  <input type="range" min="0" max="20" step="1" value={bufferStudentTarget} onChange={e => setBufferStudentTarget(parseInt(e.target.value))} className="w-full h-1.5 bg-orange-400 rounded-full appearance-none accent-white cursor-pointer" />
-                  <div className="flex justify-between font-black text-left"><span className="text-[10px] text-left">確保: {bufferStudentTarget}名分</span><span className="text-lg text-right">¥{bufferAmount.toLocaleString()}</span></div>
-                </div>
-              </div>
-
-              {/* 右側結果パネル */}
-              <div className="lg:col-span-2 space-y-6 text-left">
-                {/* 協賛金状況（自動連動） */}
-                <div className="bg-white rounded-3xl border border-slate-200 p-8 relative overflow-hidden shadow-sm text-left">
-                  <div className="absolute top-0 right-0 p-4 opacity-5 text-left"><Coins size={120} /></div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 text-left">Total Sponsorship Sum</p>
-                  <p className="text-5xl font-black text-orange-600 tracking-tighter text-left">¥{sponsorship.toLocaleString()}</p>
-                  <p className="text-[10px] text-slate-400 font-bold mt-4 italic text-left">※協賛企業管理タブで登録された {sponsors.length} 社の合計金額です。</p>
-                </div>
-
-                {/* 還元バナー */}
-                <div className="bg-orange-600 rounded-[2.5rem] p-10 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl shadow-orange-100 text-left">
-                  <div className="text-left text-white">
-                    <p className="text-orange-100 text-[10px] font-bold uppercase mb-4 tracking-[0.2em] text-left">一人当たりの月額引き下げ額</p>
-                    <div className="flex items-center gap-4 text-left">
-                      <ArrowDownCircle size={48} className="text-orange-200 animate-bounce-slow" />
-                      <span className="text-5xl md:text-7xl font-black tracking-tighter text-left">¥{reductionPerStudent.toLocaleString()}</span>
-                    </div>
-                  </div>
-                  <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[2rem] p-6 text-center min-w-[140px] text-left">
-                    <p className="text-[10px] font-bold mb-1 opacity-80 uppercase tracking-widest text-center text-white">Coverage</p>
-                    <p className="text-4xl font-black text-center text-white">{coverageRate}%</p>
-                  </div>
-                </div>
-
-                {/* 復活：コース別実質価格カード */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
-                  {COURSE_BASES.map((course) => {
-                    const discountedPrice = Math.max(0, course.price - reductionPerStudent);
-                    const isFree = discountedPrice === 0;
-                    const enrolledCount = studentCountsFromDb[course.id] || 0;
-                    return (
-                      <div key={course.id} className="bg-white rounded-3xl border border-slate-200 p-6 flex flex-col justify-between hover:border-orange-200 transition-all shadow-sm text-left group">
-                        <div className="flex justify-between items-start mb-4 text-left">
-                          <div className="text-left">
-                            <h4 className="font-black text-slate-800 text-lg tracking-tight text-left">{course.label}</h4>
-                            <span className="text-[10px] md:text-xs text-slate-300 font-bold line-through text-left">定価 ¥{course.price.toLocaleString()}</span>
-                          </div>
-                          <span className="bg-slate-50 text-slate-400 text-[9px] font-black px-2 py-1 rounded-full uppercase text-left tracking-tighter group-hover:bg-orange-50 group-hover:text-orange-500 transition-colors">{enrolledCount}名在籍</span>
-                        </div>
-                        <div className="text-left">
-                          <div className="flex items-end gap-1 text-left">
-                            <span className={`text-2xl md:text-3xl font-black text-left ${isFree ? 'text-emerald-500' : 'text-slate-900'}`}>
-                              {isFree ? '受講料無料' : `¥${discountedPrice.toLocaleString()}`}
-                            </span>
-                            {!isFree && <span className="text-[10px] text-slate-400 font-bold mb-1.5 text-left">/ 月</span>}
-                          </div>
-                          <div className="mt-2 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden text-left">
-                            <div
-                              className="h-full bg-orange-500 transition-all duration-1000 text-left"
-                              style={{ width: `${Math.min(100, (reductionPerStudent / course.price) * 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* 生徒管理 */}
         {currentUser.role === 'admin' && activeTab === 'students' && (
@@ -703,35 +448,6 @@ const App = () => {
           </div>
         )}
 
-        {/* 協賛企業管理 */}
-        {currentUser.role === 'admin' && activeTab === 'sponsors' && (
-          <div className="space-y-8 animate-in fade-in duration-500 text-left">
-            <header className="text-left"><h2 className="text-2xl font-black tracking-tight text-left text-slate-800">協賛企業・支援管理</h2></header>
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-8 text-left items-start">
-              <div className="xl:col-span-1 bg-white rounded-3xl border border-slate-200 p-6 shadow-sm text-left">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 text-left">{editingSponsor ? '企業情報を編集' : '新規企業を登録'}</h3>
-                <form onSubmit={saveSponsor} className="space-y-4 text-left">
-                  <div className="space-y-1 text-left"><label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block text-left">会社名</label><input type="text" required value={sponsorForm.name} onChange={e => setSponsorForm({ ...sponsorForm, name: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none" /></div>
-                  <div className="space-y-1 text-left"><label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block text-left">担当者</label><input type="text" value={sponsorForm.repName} onChange={e => setSponsorForm({ ...sponsorForm, repName: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none" /></div>
-                  <div className="space-y-1 text-left"><label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block text-left">Email</label><input type="email" value={sponsorForm.email} onChange={e => setSponsorForm({ ...sponsorForm, email: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none" /></div>
-                  <div className="space-y-1 text-left"><label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block text-left">月額支援額</label><input type="number" required value={sponsorForm.amount} onChange={e => setSponsorForm({ ...sponsorForm, amount: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-orange-600 text-left outline-none" /></div>
-                  <button type="submit" className="w-full bg-orange-600 text-white font-black py-4 rounded-xl shadow-lg hover:bg-orange-700 transition-all uppercase tracking-widest text-sm active:scale-95">REGISTER</button>
-                  {editingSponsor && <button type="button" onClick={() => { setEditingSponsor(null); setSponsorForm({ name: '', repName: '', email: '', amount: '' }) }} className="w-full text-slate-400 font-bold py-2 text-[10px] uppercase tracking-widest">CANCEL</button>}
-                </form>
-              </div>
-              <div className="xl:col-span-3 space-y-4 text-left">
-                <div className="flex justify-between items-end mb-2 px-2 text-slate-800 text-left"><p className="text-xs font-bold uppercase tracking-widest opacity-40 text-left">Partner List ({sponsors.length} Companies)</p><p className="font-black text-xl text-right">Total Monthly: ¥{sponsorship.toLocaleString()}</p></div>
-                {sponsors.map(s => (
-                  <div key={s.id} className="bg-white p-6 rounded-3xl border border-slate-200 flex flex-col md:flex-row justify-between items-center group hover:border-orange-300 transition-all text-left shadow-sm">
-                    <div className="text-left w-full"><div className="flex items-center gap-2 mb-1 text-left"><Building className="text-orange-500" size={16} /><h4 className="font-black text-lg text-slate-800 text-left">{s.name}</h4></div><p className="text-xs text-slate-400 font-bold uppercase tracking-widest text-left">{s.repName || '担当者名未登録'}</p></div>
-                    <div className="flex items-center gap-6 shrink-0 w-full md:w-auto justify-between md:justify-end mt-4 md:mt-0 text-left"><p className="text-xl font-black text-orange-600 text-left tracking-tighter">¥{Number(s.amount).toLocaleString()}</p><div className="flex gap-2 text-left"><button onClick={() => { setEditingSponsor(s); setSponsorForm(s); window.scrollTo(0, 0); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 rounded-lg transition-colors"><Edit2 size={16} /></button><button onClick={() => deleteSponsor(s.id)} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 rounded-lg transition-colors"><Trash2 size={16} /></button></div></div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* お知らせ/教材管理 */}
         {currentUser.role === 'admin' && activeTab === 'materials' && (
           <div className="space-y-8 animate-in fade-in duration-500 text-left">
@@ -771,9 +487,8 @@ const App = () => {
           <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500 text-left text-slate-900">
             <header className="flex flex-col md:flex-row justify-between items-start gap-6 text-left">
               <div className="text-left"><h2 className="text-3xl font-black tracking-tight text-left text-slate-800">{currentUser.name}様 <span className="text-orange-600 font-light ml-2 uppercase">My Portal</span></h2><p className="text-slate-400 text-sm font-medium mt-1 text-left">今日学んだことや作品を記録して成長をポートフォリオに残しましょう。</p></div>
-              <div className="w-full md:w-auto grid grid-cols-2 gap-4 shrink-0 text-left">
+              <div className="w-full md:w-auto grid grid-cols-1 gap-4 shrink-0 text-left">
                 <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xl flex flex-col justify-center text-left"><p className="text-[10px] font-black text-slate-400 uppercase mb-1 flex items-center gap-1.5 text-left tracking-widest"><Clock size={12} className="text-orange-500" /> Next Lesson</p><p className="text-xl font-black text-slate-800 whitespace-nowrap text-left">{currentUser.nextClassDate || '未設定'}</p></div>
-                <div className="bg-orange-600 p-5 rounded-3xl text-white shadow-xl flex flex-col justify-center text-left"><p className="text-[10px] font-black uppercase mb-1 opacity-60 tracking-widest text-left">Reduction</p><p className="text-xl font-black tracking-tighter text-left">¥{reductionPerStudent.toLocaleString()}</p></div>
               </div>
             </header>
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start text-left">
@@ -822,8 +537,6 @@ const App = () => {
       <footer className="shrink-0 mt-auto py-10 border-t border-slate-200 text-center text-slate-300 text-[10px] font-black tracking-[0.5em] uppercase text-center bg-white/50">
         Clayette Educational Management Platform
       </footer>
-
-      {showReport && <ReportModal />}
 
       <style>{`
         @media print { .print\\:hidden { display: none !important; } .print\\:bg-white { background: white !important; } .print\\:p-10 { padding: 2.5rem !important; } body { overflow: visible !important; } .rounded-[2rem], .rounded-[2.5rem] { border-radius: 1.5rem !important; } }
