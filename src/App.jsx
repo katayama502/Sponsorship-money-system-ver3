@@ -526,9 +526,30 @@ const App = () => {
             <header className="text-left"><h2 className="text-2xl font-black text-slate-800 tracking-tight text-left">教材・リソースライブラリ</h2></header>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
               {materials.map(m => (
-                <div key={m.id} className="bg-white p-6 rounded-[2rem] border border-slate-200 flex items-center group shadow-sm hover:shadow-md transition-all text-left"><div className="text-left"><h4 className="font-black text-slate-800 text-lg text-left">{m.title}</h4><div className="flex flex-wrap gap-2 mt-2 text-left">{m.tags.map(t => (<span key={t} className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase text-left tracking-widest">{t}</span>))}</div><a href={m.url} target="_blank" onClick={(e) => handleMaterialClick(e, m)} className="text-orange-600 text-xs font-black flex items-center gap-1 mt-4 text-left hover:underline uppercase tracking-tighter cursor-pointer">View Material <LinkIcon size={12} /></a></div></div>
+                <div
+                  key={m.id}
+                  onClick={(e) => {
+                    const isScratch = m.tags.some(t => t.toLowerCase() === 'scratch');
+                    if (isScratch) {
+                      handleMaterialClick(e, m);
+                    } else {
+                      window.open(m.url, '_blank');
+                    }
+                  }}
+                  className="bg-white p-6 rounded-[2rem] border border-slate-200 flex items-center group shadow-sm hover:shadow-md hover:border-orange-300 transition-all text-left cursor-pointer active:scale-95"
+                >
+                  <div className="text-left w-full">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-black text-slate-800 text-lg group-hover:text-orange-600 transition-colors">{m.title}</h4>
+                      <LinkIcon size={16} className="text-slate-300 group-hover:text-orange-500 transition-colors" />
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-left">
+                      {m.tags.map(t => (<span key={t} className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase text-left tracking-widest">{t}</span>))}
+                    </div>
+                  </div>
+                </div>
               ))}
-              {materials.length === 0 && <div className="md:col-span-2 py-20 bg-white rounded-3xl border border-dashed border-slate-200 text-center text-slate-400 font-bold uppercase tracking-widest text-xs text-center">現在、公開されている教材はありません</div>}
+              {materials.length === 0 && <div className="md:col-span-2 py-20 bg-white rounded-3xl border border-dashed border-slate-200 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">現在、公開されている教材はありません</div>}
             </div>
           </div>
         )}
