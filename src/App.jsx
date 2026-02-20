@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Users,
   Building2,
@@ -42,13 +42,17 @@ import {
   Link as LinkIcon,
   ShieldAlert,
   Mail,
-  Building
+  Building,
+  Upload,
+  Download,
+  FileArchive
 } from 'lucide-react';
 
 // Firebase imports
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot, query, serverTimestamp, addDoc, updateDoc, getDocs, where } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll } from 'firebase/storage';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -63,6 +67,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'clayette-edu-system';
 
 const COURSE_BASES = [
@@ -107,6 +112,11 @@ const App = () => {
   const [newLearningRecord, setNewLearningRecord] = useState({ title: '', content: '', imageUrl: '' });
   const [adminComment, setAdminComment] = useState({});
   const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', type: 'info' });
+
+  // --- .sb3 アップロード ---
+  const [sb3Files, setSb3Files] = useState([]);
+  const [isUploadingSb3, setIsUploadingSb3] = useState(false);
+  const sb3InputRef = useRef(null);
 
   // --- 教材データ状態 ---
   const [materials, setMaterials] = useState([]);
@@ -168,11 +178,70 @@ const App = () => {
       setMaterials(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()));
     });
 
+    // .sb3ファイルのリスナー (ログインした生徒のファイルのみ)
+    if (currentUser.role === 'student' && currentUser.studentId) {
+      const unsubSb3 = onSnapshot(
+        collection(db, 'artifacts', appId, 'public', 'data', 'students', currentUser.studentId, 'sb3_files'),
+        (snap) => {
+          setSb3Files(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.uploadedAt?.toMillis() - a.uploadedAt?.toMillis()));
+        }
+      );
+      return () => {
+        unsubStudents(); unsubAnnounce();
+        unsubLearning(); unsubMaterials();
+        unsubSb3();
+      };
+    }
+
     return () => {
       unsubStudents(); unsubAnnounce();
       unsubLearning(); unsubMaterials();
     };
   }, [currentUser]);
+
+  // --- .sb3 アップロード ---
+  const uploadSb3File = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.name.endsWith('.sb3')) {
+      setSaveMessage('エラー: .sb3ファイルを選択してください');
+      setTimeout(() => setSaveMessage(''), 3000);
+      return;
+    }
+    setIsUploadingSb3(true);
+    try {
+      const dateStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const storageRef = ref(storage, `artifacts/${appId}/sb3/${currentUser.studentId}/${dateStr}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const downloadUrl = await getDownloadURL(storageRef);
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'students', currentUser.studentId, 'sb3_files'), {
+        fileName: file.name,
+        storagePath: storageRef.fullPath,
+        downloadUrl,
+        uploadDate: dateStr,
+        uploadedAt: serverTimestamp(),
+      });
+      setSaveMessage('アップロード完了!');
+    } catch (err) {
+      console.error(err);
+      setSaveMessage(`エラー: ${err.message}`);
+    } finally {
+      setIsUploadingSb3(false);
+      if (sb3InputRef.current) sb3InputRef.current.value = '';
+      setTimeout(() => setSaveMessage(''), 4000);
+    }
+  };
+
+  const deleteSb3File = async (file) => {
+    if (!window.confirm(`「${file.fileName}」を削除しますか？`)) return;
+    try {
+      await deleteObject(ref(storage, file.storagePath));
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', currentUser.studentId, 'sb3_files', file.id));
+      setSaveMessage('削除しました');
+    } catch (err) {
+      setSaveMessage('削除エラー');
+    }
+    setTimeout(() => setSaveMessage(''), 3000);
+  };
 
   // --- 各種ハンドラー ---
 
@@ -484,37 +553,109 @@ const App = () => {
 
         {/* 受講生・保護者向け: マイページ */}
         {(currentUser.role === 'student' || currentUser.role === 'parent') && activeTab === 'mypage' && (
-          <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500 text-left text-slate-900">
+          <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500 text-left text-slate-900">
             <header className="flex flex-col md:flex-row justify-between items-start gap-6 text-left">
-              <div className="text-left"><h2 className="text-3xl font-black tracking-tight text-left text-slate-800">{currentUser.name}様 <span className="text-orange-600 font-light ml-2 uppercase">My Portal</span></h2><p className="text-slate-400 text-sm font-medium mt-1 text-left">今日学んだことや作品を記録して成長をポートフォリオに残しましょう。</p></div>
-              <div className="w-full md:w-auto grid grid-cols-1 gap-4 shrink-0 text-left">
-                <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xl flex flex-col justify-center text-left"><p className="text-[10px] font-black text-slate-400 uppercase mb-1 flex items-center gap-1.5 text-left tracking-widest"><Clock size={12} className="text-orange-500" /> Next Lesson</p><p className="text-xl font-black text-slate-800 whitespace-nowrap text-left">{currentUser.nextClassDate || '未設定'}</p></div>
+              <div className="text-left">
+                <h2 className="text-3xl font-black tracking-tight text-left text-slate-800">{currentUser.name}様 <span className="text-orange-600 font-light ml-2 uppercase">My Portal</span></h2>
+                <p className="text-slate-400 text-sm font-medium mt-1 text-left">今日学んだことや作品を記録して成長をポートフォリオに残しましょう。</p>
+              </div>
+              <div className="shrink-0">
+                <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xl flex flex-col justify-center"><p className="text-[10px] font-black text-slate-400 uppercase mb-1 flex items-center gap-1.5 tracking-widest"><Clock size={12} className="text-orange-500" /> Next Lesson</p><p className="text-xl font-black text-slate-800 whitespace-nowrap">{currentUser.nextClassDate || '未設定'}</p></div>
               </div>
             </header>
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start text-left">
-              {currentUser.role === 'student' && (
-                <div className="lg:col-span-1 bg-white rounded-3xl border border-slate-200 p-6 space-y-6 h-fit sticky top-24 shadow-sm text-left">
-                  <div className="flex items-center gap-2 font-bold text-slate-700 text-xs uppercase tracking-widest text-left"><BookOpen size={16} className="text-orange-500" /> 学習を記録する</div>
-                  <form onSubmit={submitLearningRecord} className="space-y-4 text-left"><input type="text" value={newLearningRecord.title} onChange={e => setNewLearningRecord({ ...newLearningRecord, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" placeholder="タイトル" required /><textarea value={newLearningRecord.content} onChange={e => setNewLearningRecord({ ...newLearningRecord, content: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm h-32 resize-none text-left focus:ring-2 focus:ring-orange-500 outline-none" placeholder="今日学んだことや感想" required /><input type="text" placeholder="画像URL (任意)" value={newLearningRecord.imageUrl} onChange={e => setNewLearningRecord({ ...newLearningRecord, imageUrl: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs text-left" /><button type="submit" className="w-full bg-orange-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-orange-700 transition-all flex items-center justify-center gap-2 active:scale-95 text-sm">記録を保存</button></form>
+
+            {/* 学習記録フォーム（生徒のみ・大型・中央） */}
+            {currentUser.role === 'student' && (
+              <div className="bg-white rounded-[2rem] border border-slate-200 shadow-lg p-8 md:p-12">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="bg-orange-600 p-3 rounded-2xl text-white shadow-lg"><BookOpen size={22} /></div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800">学習を記録する</h3>
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">今日学んだことや感想を書いて保存しましょう</p>
+                  </div>
                 </div>
-              )}
-              <div className={`${currentUser.role === 'student' ? 'lg:col-span-3' : 'lg:col-span-4'} space-y-6 text-left`}>
-                <h3 className="text-xl font-black text-slate-800 flex items-center gap-3 text-left"><ImageIcon size={22} className="text-orange-500" /> 成長の軌跡</h3>
-                <div className="grid grid-cols-1 gap-6 text-left">
-                  {learningRecords.length === 0 ? <div className="bg-white rounded-3xl border border-dashed border-slate-200 p-20 text-center text-slate-400 font-bold text-xs uppercase tracking-widest text-center">記録が見つかりません</div> :
-                    learningRecords.sort((a, b) => b.date.localeCompare(a.date)).map(record => (
-                      <div key={record.id} className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden flex flex-col md:flex-row shadow-sm hover:shadow-md transition-all text-left group">
-                        {record.imageUrl && (
-                          <div className="md:w-72 h-56 md:h-auto bg-slate-100 flex-shrink-0 relative overflow-hidden"><img src={record.imageUrl} alt="成果物" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?auto=format&fit=crop&q=80&w=400'; }} /></div>
-                        )}
-                        <div className="p-8 flex-1 space-y-5 text-left">
-                          <div className="text-left"><p className="text-[10px] font-black text-orange-600 uppercase tracking-[0.2em] mb-1 text-left">{new Date(record.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}</p><h4 className="text-2xl font-black text-slate-800 text-left tracking-tight">{record.title}</h4></div>
-                          <p className="text-sm text-slate-500 leading-relaxed font-medium whitespace-pre-wrap text-left">{record.content}</p>
-                          {record.comment && <div className="mt-4 bg-orange-50/70 border border-orange-100 p-5 rounded-2xl relative text-left"><div className="flex items-center gap-2 text-orange-600 font-black text-[10px] uppercase tracking-widest mb-2 text-left font-sans"><MessageSquare size={12} /> Feedback</div><p className="text-sm text-slate-700 font-bold italic text-left leading-relaxed">"{record.comment}"</p></div>}
+                <form onSubmit={submitLearningRecord} className="space-y-6">
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">タイトル</label>
+                    <input type="text" value={newLearningRecord.title} onChange={e => setNewLearningRecord({ ...newLearningRecord, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-base font-bold outline-none focus:ring-2 focus:ring-orange-500 transition-all" placeholder="例: Scratchでアニメーションを作った！" required />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">今日学んだこと・感想</label>
+                    <textarea value={newLearningRecord.content} onChange={e => setNewLearningRecord({ ...newLearningRecord, content: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-medium h-48 resize-none focus:ring-2 focus:ring-orange-500 outline-none transition-all leading-relaxed" placeholder="今日はどんなことを学びましたか？難しかったこと、面白かったことを書いてみましょう。" required />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">成果物の画像URL（任意）</label>
+                    <input type="text" placeholder="https://..." value={newLearningRecord.imageUrl} onChange={e => setNewLearningRecord({ ...newLearningRecord, imageUrl: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500 transition-all" />
+                  </div>
+                  <button type="submit" className="w-full bg-orange-600 text-white font-black py-5 rounded-2xl shadow-xl hover:bg-orange-700 transition-all flex items-center justify-center gap-3 active:scale-95 text-base uppercase tracking-widest">
+                    <Save size={20} /> 記録を保存する
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* .sb3 ファイル管理（生徒のみ） */}
+            {currentUser.role === 'student' && (
+              <div className="bg-white rounded-[2rem] border border-slate-200 shadow-lg p-8 md:p-10 space-y-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-slate-800 p-3 rounded-2xl text-white shadow-lg"><FileArchive size={22} /></div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-800">Scratchファイル管理</h3>
+                      <p className="text-xs text-slate-400 font-medium mt-0.5">.sb3 ファイルを日ごとにアップロードして管理できます</p>
+                    </div>
+                  </div>
+                  <div>
+                    <input ref={sb3InputRef} type="file" accept=".sb3" onChange={uploadSb3File} className="hidden" id="sb3-upload" />
+                    <label htmlFor="sb3-upload" className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-sm cursor-pointer transition-all shadow-md active:scale-95 uppercase tracking-wider ${isUploadingSb3 ? 'bg-slate-200 text-slate-400 pointer-events-none' : 'bg-slate-900 text-white hover:bg-orange-600'}`}>
+                      {isUploadingSb3 ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
+                      {isUploadingSb3 ? 'アップロード中...' : '.sb3をアップロード'}
+                    </label>
+                  </div>
+                </div>
+                {sb3Files.length === 0 ? (
+                  <div className="border border-dashed border-slate-200 rounded-2xl py-16 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">アップロード済みのファイルはありません</div>
+                ) : (
+                  <div className="space-y-3">
+                    {sb3Files.map(file => (
+                      <div key={file.id} className="flex items-center justify-between bg-slate-50 rounded-2xl px-5 py-4 border border-slate-100 group hover:border-orange-200 transition-all">
+                        <div className="flex items-center gap-4 overflow-hidden">
+                          <div className="bg-orange-100 text-orange-600 p-2.5 rounded-xl shrink-0"><FileArchive size={18} /></div>
+                          <div className="overflow-hidden">
+                            <p className="font-black text-slate-800 text-sm truncate">{file.fileName}</p>
+                            <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">{file.uploadDate}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <a href={file.downloadUrl} download={file.fileName} className="p-2.5 bg-white border border-slate-200 text-slate-400 hover:text-orange-600 rounded-xl transition-colors" title="ダウンロード"><Download size={16} /></a>
+                          <button onClick={() => deleteSb3File(file)} className="p-2.5 bg-white border border-slate-200 text-slate-400 hover:text-rose-500 rounded-xl transition-colors" title="削除"><Trash2 size={16} /></button>
                         </div>
                       </div>
                     ))}
-                </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 成長の軌跡 */}
+            <div className="space-y-6">
+              <h3 className="text-xl font-black text-slate-800 flex items-center gap-3"><ImageIcon size={22} className="text-orange-500" /> 成長の軌跡</h3>
+              <div className="grid grid-cols-1 gap-6">
+                {learningRecords.length === 0
+                  ? <div className="bg-white rounded-3xl border border-dashed border-slate-200 p-20 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">記録が見つかりません</div>
+                  : learningRecords.sort((a, b) => b.date.localeCompare(a.date)).map(record => (
+                    <div key={record.id} className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden flex flex-col md:flex-row shadow-sm hover:shadow-md transition-all group">
+                      {record.imageUrl && (
+                        <div className="md:w-72 h-56 md:h-auto bg-slate-100 flex-shrink-0 overflow-hidden"><img src={record.imageUrl} alt="成果物" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?auto=format&fit=crop&q=80&w=400'; }} /></div>
+                      )}
+                      <div className="p-8 flex-1 space-y-5">
+                        <div><p className="text-[10px] font-black text-orange-600 uppercase tracking-[0.2em] mb-1">{new Date(record.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}</p><h4 className="text-2xl font-black text-slate-800 tracking-tight">{record.title}</h4></div>
+                        <p className="text-sm text-slate-500 leading-relaxed font-medium whitespace-pre-wrap">{record.content}</p>
+                        {record.comment && <div className="mt-4 bg-orange-50/70 border border-orange-100 p-5 rounded-2xl"><div className="flex items-center gap-2 text-orange-600 font-black text-[10px] uppercase tracking-widest mb-2"><MessageSquare size={12} /> Feedback</div><p className="text-sm text-slate-700 font-bold italic leading-relaxed">"{record.comment}"</p></div>}
+                      </div>
+                    </div>
+                  ))
+                }
               </div>
             </div>
           </div>
