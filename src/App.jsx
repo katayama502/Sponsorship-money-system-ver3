@@ -145,7 +145,7 @@ const App = () => {
           videoId = u.pathname.split('/shorts/')[1].split('?')[0];
         }
       }
-      if (videoId) return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+      if (videoId) return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0`;
     } catch { }
     return null;
   };
