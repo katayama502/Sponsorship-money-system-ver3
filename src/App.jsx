@@ -126,6 +126,30 @@ const App = () => {
   const [splitRatio, setSplitRatio] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
 
+  // --- YouTube モーダル ---
+  const [youtubeModal, setYoutubeModal] = useState(null); // { title, embedUrl }
+
+  // YouTube URLからビデオIDを抽出するヘルパー
+  const getYoutubeEmbedUrl = (url) => {
+    try {
+      const u = new URL(url);
+      let videoId = null;
+      if (u.hostname === 'youtu.be') {
+        videoId = u.pathname.slice(1).split('?')[0];
+      } else if (u.hostname.includes('youtube.com')) {
+        if (u.pathname === '/watch') {
+          videoId = u.searchParams.get('v');
+        } else if (u.pathname.startsWith('/embed/')) {
+          videoId = u.pathname.split('/embed/')[1].split('?')[0];
+        } else if (u.pathname.startsWith('/shorts/')) {
+          videoId = u.pathname.split('/shorts/')[1].split('?')[0];
+        }
+      }
+      if (videoId) return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+    } catch { }
+    return null;
+  };
+
   // --- Firebase 認証 & リアルタイムリスナー ---
   // --- Resizer Logic ---
   useEffect(() => {
@@ -363,6 +387,21 @@ const App = () => {
       e.preventDefault();
       setActiveWorkspace(material);
     }
+  };
+
+  const handleMaterialOpen = (e, m) => {
+    e.preventDefault();
+    const isScratch = m.tags.some(t => t.toLowerCase() === 'scratch');
+    if (isScratch) {
+      setActiveWorkspace(m);
+      return;
+    }
+    const embedUrl = getYoutubeEmbedUrl(m.url);
+    if (embedUrl) {
+      setYoutubeModal({ title: m.title, embedUrl });
+      return;
+    }
+    window.open(m.url, '_blank');
   };
 
   // --- ログイン画面 ---
@@ -666,30 +705,33 @@ const App = () => {
           <div className="space-y-8 text-left animate-in fade-in duration-500">
             <header className="text-left"><h2 className="text-2xl font-black text-slate-800 tracking-tight text-left">教材・リソースライブラリ</h2></header>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-              {materials.map(m => (
-                <div
-                  key={m.id}
-                  onClick={(e) => {
-                    const isScratch = m.tags.some(t => t.toLowerCase() === 'scratch');
-                    if (isScratch) {
-                      handleMaterialClick(e, m);
-                    } else {
-                      window.open(m.url, '_blank');
-                    }
-                  }}
-                  className="bg-white p-6 rounded-[2rem] border border-slate-200 flex items-center group shadow-sm hover:shadow-md hover:border-orange-300 transition-all text-left cursor-pointer active:scale-95"
-                >
-                  <div className="text-left w-full">
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-black text-slate-800 text-lg group-hover:text-orange-600 transition-colors">{m.title}</h4>
-                      <LinkIcon size={16} className="text-slate-300 group-hover:text-orange-500 transition-colors" />
-                    </div>
-                    <div className="flex flex-wrap gap-2 text-left">
-                      {m.tags.map(t => (<span key={t} className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase text-left tracking-widest">{t}</span>))}
+              {materials.map(m => {
+                const isYoutube = !!getYoutubeEmbedUrl(m.url);
+                const isScratch = m.tags.some(t => t.toLowerCase() === 'scratch');
+                return (
+                  <div
+                    key={m.id}
+                    onClick={(e) => handleMaterialOpen(e, m)}
+                    className="bg-white p-6 rounded-[2rem] border border-slate-200 flex items-center group shadow-sm hover:shadow-md hover:border-orange-300 transition-all text-left cursor-pointer active:scale-95"
+                  >
+                    <div className="text-left w-full">
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-black text-slate-800 text-lg group-hover:text-orange-600 transition-colors">{m.title}</h4>
+                        {isYoutube ? (
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-red-100 text-red-600 uppercase tracking-widest">YouTube</span>
+                        ) : isScratch ? (
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 uppercase tracking-widest">Scratch</span>
+                        ) : (
+                          <LinkIcon size={16} className="text-slate-300 group-hover:text-orange-500 transition-colors" />
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-left">
+                        {m.tags.map(t => (<span key={t} className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase text-left tracking-widest">{t}</span>))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {materials.length === 0 && <div className="md:col-span-2 py-20 bg-white rounded-3xl border border-dashed border-slate-200 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">現在、公開されている教材はありません</div>}
             </div>
           </div>
@@ -699,6 +741,42 @@ const App = () => {
       <footer className="shrink-0 mt-auto py-10 border-t border-slate-200 text-center text-slate-300 text-[10px] font-black tracking-[0.5em] uppercase text-center bg-white/50">
         Clayette Educational Management Platform
       </footer>
+
+      {/* YouTube 動画モーダル */}
+      {youtubeModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setYoutubeModal(null)}
+        >
+          <div
+            className="bg-slate-900 rounded-3xl overflow-hidden shadow-2xl w-full max-w-4xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <span className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">YouTube</span>
+                <h3 className="text-white font-bold text-base truncate max-w-lg">{youtubeModal.title}</h3>
+              </div>
+              <button
+                onClick={() => setYoutubeModal(null)}
+                className="flex items-center gap-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl text-xs font-bold uppercase transition-colors"
+              >
+                <X size={14} /> 閉じる
+              </button>
+            </div>
+            <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+              <iframe
+                src={youtubeModal.embedUrl}
+                title={youtubeModal.title}
+                className="absolute inset-0 w-full h-full"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @media print { .print\\:hidden { display: none !important; } .print\\:bg-white { background: white !important; } .print\\:p-10 { padding: 2.5rem !important; } body { overflow: visible !important; } .rounded-[2rem], .rounded-[2.5rem] { border-radius: 1.5rem !important; } }
