@@ -89,12 +89,11 @@ const MATERIAL_CATEGORIES = [
 ];
 
 const getLevelCharacter = (percentage) => {
-  if (percentage >= 100) return { emoji: "👑", name: "プログラミング王様", color: "text-amber-500", bg: "bg-amber-100", border: "border-amber-400" };
-  if (percentage >= 80) return { emoji: "🐉", name: "つよつよドラゴン", color: "text-purple-600", bg: "bg-purple-100", border: "border-purple-400" };
-  if (percentage >= 60) return { emoji: "🦁", name: "ゆうかんなライオン", color: "text-orange-600", bg: "bg-orange-100", border: "border-orange-400" };
-  if (percentage >= 40) return { emoji: "🐑", name: "もこもここひつじ", color: "text-sky-500", bg: "bg-sky-100", border: "border-sky-400" };
-  if (percentage >= 20) return { emoji: "🐣", name: "げんきなひよこ", color: "text-yellow-600", bg: "bg-yellow-100", border: "border-yellow-400" };
-  return { emoji: "🥚", name: "はじまりのたまご", color: "text-slate-500", bg: "bg-slate-100", border: "border-slate-300" };
+  if (percentage >= 100) return { imageUrl: "/characters/lv5.png", name: "プログラミングマスター", color: "text-amber-500", bg: "bg-amber-100", border: "border-amber-400" };
+  if (percentage >= 75) return { imageUrl: "/characters/lv4.png", name: "つよつよプログラマー", color: "text-purple-600", bg: "bg-purple-100", border: "border-purple-400" };
+  if (percentage >= 50) return { imageUrl: "/characters/lv3.png", name: "ゆうかんなチャレンジャー", color: "text-orange-600", bg: "bg-orange-100", border: "border-orange-400" };
+  if (percentage >= 25) return { imageUrl: "/characters/lv2.png", name: "げんきなチャレンジャー", color: "text-sky-500", bg: "bg-sky-100", border: "border-sky-400" };
+  return { imageUrl: "/characters/lv1.png", name: "はじまりのルーキー", color: "text-slate-500", bg: "bg-slate-100", border: "border-slate-300" };
 };
 
 const getMaterialThumbnail = (category) => {
@@ -151,7 +150,7 @@ const App = () => {
 
   // --- 教材データ状態 ---
   const [materials, setMaterials] = useState([]);
-  const [materialForm, setMaterialForm] = useState({ title: '', url: '', category: 'scratch' });
+  const [materialForm, setMaterialForm] = useState({ title: '', url: '', category: 'scratch', thumbnailUrl: '' });
   const [editingMaterial, setEditingMaterial] = useState(null);
   const [activeWorkspace, setActiveWorkspace] = useState(null);
   const [splitRatio, setSplitRatio] = useState(50);
@@ -374,7 +373,7 @@ const App = () => {
       } else {
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'materials'), { ...data, createdAt: serverTimestamp() });
       }
-      setMaterialForm({ title: '', url: '', category: 'scratch' });
+      setMaterialForm({ title: '', url: '', category: 'scratch', thumbnailUrl: '' });
       setEditingMaterial(null);
       setSaveMessage('教材保存完了');
     } catch (e) { setSaveMessage('エラー'); }
@@ -645,6 +644,7 @@ const App = () => {
                       <form onSubmit={saveMaterial} className="space-y-4 text-left">
                         <input type="text" placeholder="タイトル" value={materialForm.title} onChange={e => setMaterialForm({ ...materialForm, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" />
                         <input type="url" placeholder="URL" value={materialForm.url} onChange={e => setMaterialForm({ ...materialForm, url: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" />
+                        <input type="url" placeholder="サムネイル画像URL (任意)" value={materialForm.thumbnailUrl || ''} onChange={e => setMaterialForm({ ...materialForm, thumbnailUrl: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" />
                         <select value={materialForm.category} onChange={e => setMaterialForm({ ...materialForm, category: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500 appearance-none">
                           {MATERIAL_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                         </select>
@@ -653,7 +653,18 @@ const App = () => {
                     </div>
                     <div className="md:col-span-2 space-y-4 text-left">
                       {materials.map(m => (
-                        <div key={m.id} className="bg-white p-6 rounded-3xl border border-slate-200 flex justify-between items-start group shadow-sm text-left hover:border-orange-200 transition-all"><div className="text-left"><h4 className="font-black text-slate-800 text-lg text-left">{m.title}</h4><div className="flex flex-wrap gap-2 mt-2 text-left"><span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter text-left">{MATERIAL_CATEGORIES.find(c => c.id === m.category)?.label || m.category || (m.tags && m.tags[0])}</span></div><a href={m.url} target="_blank" className="text-orange-600 text-xs font-black flex items-center gap-1 mt-4 hover:underline text-left uppercase">Open <LinkIcon size={12} /></a></div><div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all text-left"><button onClick={() => { setEditingMaterial(m); setMaterialForm({ ...m, category: m.category || 'scratch' }); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 transition-colors"><Edit2 size={14} /></button><button onClick={() => deleteMaterial(m.id)} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={14} /></button></div></div>
+                        <div key={m.id} className="bg-white p-6 rounded-3xl border border-slate-200 flex justify-between items-start group shadow-sm text-left hover:border-orange-200 transition-all">
+                          <div className="flex gap-4">
+                            <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0">
+                               <img src={m.thumbnailUrl || getMaterialThumbnail(m.category)} alt="" className="w-full h-full object-cover" />
+                            </div>
+                            <div className="text-left"><h4 className="font-black text-slate-800 text-lg text-left">{m.title}</h4><div className="flex flex-wrap gap-2 mt-2 text-left"><span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter text-left">{MATERIAL_CATEGORIES.find(c => c.id === m.category)?.label || m.category || (m.tags && m.tags[0])}</span></div><a href={m.url} target="_blank" className="text-orange-600 text-xs font-black flex items-center gap-1 mt-4 hover:underline text-left uppercase">Open <LinkIcon size={12} /></a></div>
+                          </div>
+                          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all text-left">
+                            <button onClick={() => { setEditingMaterial(m); setMaterialForm({ ...m, category: m.category || 'scratch' }); window.scrollTo(0,0); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 transition-colors"><Edit2 size={14} /></button>
+                            <button onClick={() => deleteMaterial(m.id)} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={14} /></button>
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -840,8 +851,13 @@ const App = () => {
 
                   return (
                     <div className={`rounded-[2rem] border shadow-lg overflow-hidden flex flex-col md:flex-row items-center p-8 gap-8 transition-all ${charInfo.bg} ${charInfo.border}`}>
-                      <div className="shrink-0 animate-bounce-slow text-7xl bg-white/60 p-6 rounded-[2.5rem] shadow-sm transform hover:scale-110 transition-transform duration-300 flex items-center justify-center w-32 h-32">
-                        {charInfo.emoji}
+                      <div className="shrink-0 animate-bounce-slow bg-white/60 p-4 rounded-[2.5rem] shadow-sm transform hover:scale-105 transition-transform duration-300 flex items-center justify-center w-36 h-36">
+                        <img 
+                          src={charInfo.imageUrl} 
+                          alt="レベルアップキャラクター" 
+                          className="w-full h-full object-contain"
+                          onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div class="text-4xl text-slate-400 text-center font-bold">🐣<br/><span class="text-[10px]">Image Not Found</span></div>'; }}
+                        />
                       </div>
                       <div className="flex-1 w-full space-y-4 text-center md:text-left">
                         <div>
@@ -1042,8 +1058,11 @@ const App = () => {
               <div className="space-y-8 text-left animate-in fade-in duration-500">
                 <header className="text-left"><h2 className="text-2xl font-black text-slate-800 tracking-tight text-left">教材・リソースライブラリ</h2></header>
                 <div className="space-y-12">
-                  {MATERIAL_CATEGORIES.map(category => {
-                    const categoryMaterials = materials.filter(m => m.category === category.id);
+                  {[...MATERIAL_CATEGORIES, { id: 'other', label: 'その他' }].map(category => {
+                    const categoryMaterials = category.id === 'other'
+                      ? materials.filter(m => !MATERIAL_CATEGORIES.some(c => c.id === m.category))
+                      : materials.filter(m => m.category === category.id);
+                      
                     if (categoryMaterials.length === 0) return null;
 
                     return (
@@ -1066,7 +1085,7 @@ const App = () => {
                               >
                                 <div className="relative h-40 overflow-hidden cursor-pointer bg-slate-100" onClick={(e) => handleMaterialOpen(e, m)}>
                                   <img 
-                                    src={getMaterialThumbnail(m.category)} 
+                                    src={m.thumbnailUrl || getMaterialThumbnail(m.category)} 
                                     alt={m.title} 
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                                   />
