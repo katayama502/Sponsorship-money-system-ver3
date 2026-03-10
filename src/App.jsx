@@ -77,6 +77,12 @@ const COURSE_BASES = [
   { id: 'entry', label: '月1回コース', price: 5000 },
 ];
 
+const MATERIAL_CATEGORIES = [
+  { id: 'scratch', label: 'Scratch' },
+  { id: 'Canva', label: 'Canva' },
+  { id: 'robot', label: 'Robot' }
+];
+
 // --- ユーティリティ: ID・パスワード生成 ---
 const generateCredentials = () => {
   const chars = "abcdefghjkmnpqrstuvwxyz23456789";
@@ -109,9 +115,11 @@ const App = () => {
   const [generatedCreds, setGeneratedCreds] = useState(null);
 
   // --- 学習記録 & お知らせフォーム ---
-  const [newLearningRecord, setNewLearningRecord] = useState({ title: '', content: '', imageUrl: '' });
+  const [newLearningRecord, setNewLearningRecord] = useState({ title: '', content: {}, imageUrl: '', fileUrl: '', linkUrl: '' });
   const [adminComment, setAdminComment] = useState({});
   const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', type: 'info' });
+  const [reflectionTemplate, setReflectionTemplate] = useState([]);
+  const [reflectionItemForm, setReflectionItemForm] = useState({ title: '', type: 'textarea' });
 
   // --- .sb3 アップロード ---
   const [sb3Files, setSb3Files] = useState([]);
@@ -120,7 +128,7 @@ const App = () => {
 
   // --- 教材データ状態 ---
   const [materials, setMaterials] = useState([]);
-  const [materialForm, setMaterialForm] = useState({ title: '', url: '', tags: '' });
+  const [materialForm, setMaterialForm] = useState({ title: '', url: '', category: 'scratch' });
   const [editingMaterial, setEditingMaterial] = useState(null);
   const [activeWorkspace, setActiveWorkspace] = useState(null);
   const [splitRatio, setSplitRatio] = useState(50);
@@ -201,6 +209,9 @@ const App = () => {
     const unsubMaterials = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'materials'), (snap) => {
       setMaterials(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()));
     });
+    const unsubReflections = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'reflection_template'), (snap) => {
+      setReflectionTemplate(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)));
+    });
 
     // .sb3ファイルのリスナー (ログインした生徒のファイルのみ)
     if (currentUser.role === 'student' && currentUser.studentId) {
@@ -212,14 +223,14 @@ const App = () => {
       );
       return () => {
         unsubStudents(); unsubAnnounce();
-        unsubLearning(); unsubMaterials();
+        unsubLearning(); unsubMaterials(); unsubReflections();
         unsubSb3();
       };
     }
 
     return () => {
       unsubStudents(); unsubAnnounce();
-      unsubLearning(); unsubMaterials();
+      unsubLearning(); unsubMaterials(); unsubReflections();
     };
   }, [currentUser]);
 
@@ -334,14 +345,13 @@ const App = () => {
   const saveMaterial = async (e) => {
     e.preventDefault();
     try {
-      const tagsArray = materialForm.tags.split(',').map(t => t.trim()).filter(t => t);
-      const data = { ...materialForm, tags: tagsArray, updatedAt: serverTimestamp() };
+      const data = { ...materialForm, updatedAt: serverTimestamp() };
       if (editingMaterial) {
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', editingMaterial.id), data);
       } else {
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'materials'), { ...data, createdAt: serverTimestamp() });
       }
-      setMaterialForm({ title: '', url: '', tags: '' });
+      setMaterialForm({ title: '', url: '', category: 'scratch' });
       setEditingMaterial(null);
       setSaveMessage('教材保存完了');
     } catch (e) { setSaveMessage('エラー'); }
@@ -353,9 +363,30 @@ const App = () => {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'learning_records'), {
         ...newLearningRecord, studentId: currentUser.studentId, studentName: currentUser.name, date: new Date().toISOString(), createdAt: serverTimestamp(), comment: ''
       });
-      setNewLearningRecord({ title: '', content: '', imageUrl: '' });
+      setNewLearningRecord({ title: '', content: {}, imageUrl: '', fileUrl: '', linkUrl: '' });
       setSaveMessage('記録しました');
     } catch (e) { setSaveMessage('失敗'); }
+  };
+
+  const saveReflectionItem = async (e) => {
+    e.preventDefault();
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reflection_template'), {
+        ...reflectionItemForm, createdAt: serverTimestamp()
+      });
+      setReflectionItemForm({ title: '', type: 'textarea' });
+      setSaveMessage('項目を追加しました');
+    } catch (e) { setSaveMessage('エラー'); }
+    setTimeout(() => setSaveMessage(''), 3000);
+  };
+
+  const deleteReflectionItem = async (id) => {
+    if (!window.confirm('削除しますか？')) return;
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reflection_template', id));
+      setSaveMessage('削除しました');
+    } catch (e) { }
+    setTimeout(() => setSaveMessage(''), 3000);
   };
 
   const submitAdminComment = async (recordId) => {
@@ -383,7 +414,8 @@ const App = () => {
   };
 
   const handleMaterialClick = (e, material) => {
-    if (material.tags.some(t => t.toLowerCase() === 'scratch')) {
+    const isScratch = material.category === 'scratch' || (material.tags && material.tags.some(t => t.toLowerCase() === 'scratch'));
+    if (isScratch) {
       e.preventDefault();
       setActiveWorkspace(material);
     }
@@ -391,7 +423,7 @@ const App = () => {
 
   const handleMaterialOpen = (e, m) => {
     e.preventDefault();
-    const isScratch = m.tags.some(t => t.toLowerCase() === 'scratch');
+    const isScratch = m.category === 'scratch' || (m.tags && m.tags.some(t => t.toLowerCase() === 'scratch'));
     if (isScratch) {
       setActiveWorkspace(m);
       return;
@@ -492,6 +524,7 @@ const App = () => {
                 <>
                   <button onClick={() => setActiveTab('students')} className={`px-2 md:px-4 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${activeTab === 'students' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'}`}>生徒管理</button>
                   <button onClick={() => setActiveTab('materials')} className={`px-2 md:px-4 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${activeTab === 'materials' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'}`}>教材管理</button>
+                  <button onClick={() => setActiveTab('reflections')} className={`px-2 md:px-4 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${activeTab === 'reflections' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'}`}>振り返り項目</button>
                   <button onClick={() => setActiveTab('notices')} className={`px-2 md:px-4 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${activeTab === 'notices' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'}`}>お知らせ</button>
                 </>
               ) : (
@@ -566,13 +599,15 @@ const App = () => {
                 <form onSubmit={saveMaterial} className="space-y-4 text-left">
                   <input type="text" placeholder="タイトル" value={materialForm.title} onChange={e => setMaterialForm({ ...materialForm, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" />
                   <input type="url" placeholder="URL" value={materialForm.url} onChange={e => setMaterialForm({ ...materialForm, url: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" />
-                  <input type="text" placeholder="タグ (コンマ区切り)" value={materialForm.tags} onChange={e => setMaterialForm({ ...materialForm, tags: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" />
+                  <select value={materialForm.category} onChange={e => setMaterialForm({ ...materialForm, category: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500 appearance-none">
+                    {MATERIAL_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                  </select>
                   <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg hover:bg-orange-600 transition-all uppercase tracking-widest text-sm">SAVE</button>
                 </form>
               </div>
               <div className="md:col-span-2 space-y-4 text-left">
                 {materials.map(m => (
-                  <div key={m.id} className="bg-white p-6 rounded-3xl border border-slate-200 flex justify-between items-start group shadow-sm text-left hover:border-orange-200 transition-all"><div className="text-left"><h4 className="font-black text-slate-800 text-lg text-left">{m.title}</h4><div className="flex flex-wrap gap-2 mt-2 text-left">{m.tags.map(t => (<span key={t} className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter text-left">{t}</span>))}</div><a href={m.url} target="_blank" className="text-orange-600 text-xs font-black flex items-center gap-1 mt-4 hover:underline text-left uppercase">Open <LinkIcon size={12} /></a></div><div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all text-left"><button onClick={() => { setEditingMaterial(m); setMaterialForm({ ...m, tags: m.tags.join(',') }); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 transition-colors"><Edit2 size={14} /></button><button onClick={() => deleteMaterial(m.id)} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={14} /></button></div></div>
+                  <div key={m.id} className="bg-white p-6 rounded-3xl border border-slate-200 flex justify-between items-start group shadow-sm text-left hover:border-orange-200 transition-all"><div className="text-left"><h4 className="font-black text-slate-800 text-lg text-left">{m.title}</h4><div className="flex flex-wrap gap-2 mt-2 text-left"><span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter text-left">{MATERIAL_CATEGORIES.find(c => c.id === m.category)?.label || m.category || (m.tags && m.tags[0])}</span></div><a href={m.url} target="_blank" className="text-orange-600 text-xs font-black flex items-center gap-1 mt-4 hover:underline text-left uppercase">Open <LinkIcon size={12} /></a></div><div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all text-left"><button onClick={() => { setEditingMaterial(m); setMaterialForm({ ...m, category: m.category || 'scratch' }); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 transition-colors"><Edit2 size={14} /></button><button onClick={() => deleteMaterial(m.id)} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={14} /></button></div></div>
                 ))}
               </div>
             </div>
@@ -586,6 +621,34 @@ const App = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
               <div className="md:col-span-1 bg-white p-6 rounded-3xl border border-slate-200 h-fit shadow-sm text-left"><h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 text-left">新規投稿</h3><form onSubmit={postAnnouncement} className="space-y-4 text-left"><input type="text" required placeholder="タイトル" value={announcementForm.title} onChange={e => setAnnouncementForm({ ...announcementForm, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" /><textarea required placeholder="本文" value={announcementForm.content} onChange={e => setAnnouncementForm({ ...announcementForm, content: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm h-32 resize-none text-left focus:ring-2 focus:ring-orange-500 outline-none" /><select value={announcementForm.type} onChange={e => setAnnouncementForm({ ...announcementForm, type: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none appearance-none text-left"><option value="info">通常のお知らせ</option><option value="emergency">緊急・重要連絡</option></select><button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg hover:bg-orange-600 transition-all uppercase tracking-[0.2em] text-sm">POST</button></form></div>
               <div className="md:col-span-2 space-y-4 text-left">{announcements.map(notice => (<div key={notice.id} className="bg-white p-6 rounded-[2rem] border border-slate-200 flex justify-between items-start group shadow-sm text-left transition-all hover:border-orange-200"><div><div className="flex items-center gap-3 mb-2 text-left"><span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest text-left ${notice.type === 'emergency' ? 'bg-rose-100 text-rose-600' : 'bg-orange-100 text-orange-600'}`}>{notice.type}</span><span className="text-[10px] font-bold text-slate-400 text-left">{notice.createdAt?.toDate().toLocaleDateString()}</span></div><h4 className="font-black text-lg text-left text-slate-800">{notice.title}</h4><p className="text-sm text-slate-500 mt-2 leading-relaxed text-left">{notice.content}</p></div><button onClick={async () => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'announcements', notice.id))} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all shrink-0 text-left"><Trash2 size={18} /></button></div>))}</div>
+            </div>
+          </div>
+        )}
+
+        {/* 振り返り項目管理 */}
+        {currentUser.role === 'admin' && activeTab === 'reflections' && (
+          <div className="space-y-8 animate-in fade-in duration-500 text-left">
+            <header className="text-left font-black text-2xl text-left text-slate-800">振り返り項目設定</header>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
+              <div className="md:col-span-1 bg-white p-6 rounded-3xl border border-slate-200 h-fit shadow-sm text-left">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 text-left">新規項目追加</h3>
+                <form onSubmit={saveReflectionItem} className="space-y-4 text-left">
+                  <input type="text" required placeholder="項目名 (例: 今日の目標)" value={reflectionItemForm.title} onChange={e => setReflectionItemForm({ ...reflectionItemForm, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" />
+                  <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg hover:bg-orange-600 transition-all uppercase tracking-[0.2em] text-sm">追加</button>
+                </form>
+              </div>
+              <div className="md:col-span-2 space-y-4 text-left">
+                {reflectionTemplate.map((item, idx) => (
+                  <div key={item.id} className="bg-white p-5 rounded-2xl border border-slate-200 flex justify-between items-center shadow-sm text-left">
+                    <div className="flex gap-4 items-center">
+                      <span className="text-xl font-black text-slate-200">{idx + 1}</span>
+                      <h4 className="font-bold text-base text-slate-800">{item.title}</h4>
+                    </div>
+                    <button onClick={() => deleteReflectionItem(item.id)} className="text-slate-300 hover:text-rose-500 transition-colors p-2"><Trash2 size={18} /></button>
+                  </div>
+                ))}
+                {reflectionTemplate.length === 0 && <p className="text-slate-400 text-sm font-bold py-10 text-center">項目がまだありません</p>}
+              </div>
             </div>
           </div>
         )}
@@ -618,13 +681,28 @@ const App = () => {
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">タイトル</label>
                     <input type="text" value={newLearningRecord.title} onChange={e => setNewLearningRecord({ ...newLearningRecord, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-base font-bold outline-none focus:ring-2 focus:ring-orange-500 transition-all" placeholder="例: Scratchでアニメーションを作った！" required />
                   </div>
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">今日学んだこと・感想</label>
-                    <textarea value={newLearningRecord.content} onChange={e => setNewLearningRecord({ ...newLearningRecord, content: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-medium h-48 resize-none focus:ring-2 focus:ring-orange-500 outline-none transition-all leading-relaxed" placeholder="今日はどんなことを学びましたか？難しかったこと、面白かったことを書いてみましょう。" required />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">成果物の画像URL（任意）</label>
-                    <input type="text" placeholder="https://..." value={newLearningRecord.imageUrl} onChange={e => setNewLearningRecord({ ...newLearningRecord, imageUrl: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500 transition-all" />
+                  {reflectionTemplate.length > 0 ? (
+                    reflectionTemplate.map(item => (
+                      <div key={item.id}>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">{item.title}</label>
+                        <textarea value={newLearningRecord.content[item.id] || ''} onChange={e => setNewLearningRecord({ ...newLearningRecord, content: { ...newLearningRecord.content, [item.id]: e.target.value } })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-medium h-24 resize-none focus:ring-2 focus:ring-orange-500 outline-none transition-all leading-relaxed" placeholder={`${item.title}を入力してください`} required />
+                      </div>
+                    ))
+                  ) : (
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">今日学んだこと・感想</label>
+                      <textarea value={newLearningRecord.content['default'] || ''} onChange={e => setNewLearningRecord({ ...newLearningRecord, content: { ...newLearningRecord.content, default: e.target.value } })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-medium h-48 resize-none focus:ring-2 focus:ring-orange-500 outline-none transition-all leading-relaxed" placeholder="今日はどんなことを学びましたか？難しかったこと、面白かったことを書いてみましょう。" required />
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">成果物の画像URL（任意）</label>
+                      <input type="url" placeholder="https://..." value={newLearningRecord.imageUrl} onChange={e => setNewLearningRecord({ ...newLearningRecord, imageUrl: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500 transition-all" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">作品リンク (Canva等・任意)</label>
+                      <input type="url" placeholder="https://..." value={newLearningRecord.linkUrl} onChange={e => setNewLearningRecord({ ...newLearningRecord, linkUrl: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500 transition-all" />
+                    </div>
                   </div>
                   <button type="submit" className="w-full bg-orange-600 text-white font-black py-5 rounded-2xl shadow-xl hover:bg-orange-700 transition-all flex items-center justify-center gap-3 active:scale-95 text-base uppercase tracking-widest">
                     <Save size={20} /> 記録を保存する
@@ -689,7 +767,33 @@ const App = () => {
                       )}
                       <div className="p-8 flex-1 space-y-5">
                         <div><p className="text-[10px] font-black text-orange-600 uppercase tracking-[0.2em] mb-1">{new Date(record.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}</p><h4 className="text-2xl font-black text-slate-800 tracking-tight">{record.title}</h4></div>
-                        <p className="text-sm text-slate-500 leading-relaxed font-medium whitespace-pre-wrap">{record.content}</p>
+
+                        {/* 記録内容の表示 */}
+                        {typeof record.content === 'object' ? (
+                          reflectionTemplate.length > 0 ? (
+                            reflectionTemplate.map(item => record.content[item.id] && (
+                              <div key={item.id} className="mt-4">
+                                <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{item.title}</h5>
+                                <p className="text-sm text-slate-600 leading-relaxed font-medium whitespace-pre-wrap bg-slate-50 p-4 rounded-xl">{record.content[item.id]}</p>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="mt-4">
+                              <p className="text-sm text-slate-600 leading-relaxed font-medium whitespace-pre-wrap">{record.content['default'] || Object.values(record.content)[0]}</p>
+                            </div>
+                          )
+                        ) : (
+                          <p className="text-sm text-slate-500 leading-relaxed font-medium whitespace-pre-wrap">{record.content}</p>
+                        )}
+
+                        {/* リンク・ファイルの表示 */}
+                        {record.linkUrl && (
+                          <div className="mt-4 flex items-center gap-2">
+                            <LinkIcon size={16} className="text-orange-500" />
+                            <a href={record.linkUrl} target="_blank" className="text-sm font-bold text-orange-600 hover:underline">作品リンクを見る</a>
+                          </div>
+                        )}
+
                         {record.comment && <div className="mt-4 bg-orange-50/70 border border-orange-100 p-5 rounded-2xl"><div className="flex items-center gap-2 text-orange-600 font-black text-[10px] uppercase tracking-widest mb-2"><MessageSquare size={12} /> Feedback</div><p className="text-sm text-slate-700 font-bold italic leading-relaxed">"{record.comment}"</p></div>}
                       </div>
                     </div>
@@ -707,7 +811,7 @@ const App = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
               {materials.map(m => {
                 const isYoutube = !!getYoutubeEmbedUrl(m.url);
-                const isScratch = m.tags.some(t => t.toLowerCase() === 'scratch');
+                const isScratch = m.category === 'scratch' || (m.tags && m.tags.some(t => t.toLowerCase() === 'scratch'));
                 return (
                   <div
                     key={m.id}
@@ -726,7 +830,7 @@ const App = () => {
                         )}
                       </div>
                       <div className="flex flex-wrap gap-2 text-left">
-                        {m.tags.map(t => (<span key={t} className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase text-left tracking-widest">{t}</span>))}
+                        <span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase text-left tracking-widest">{MATERIAL_CATEGORIES.find(c => c.id === m.category)?.label || m.category || (m.tags && m.tags[0])}</span>
                       </div>
                     </div>
                   </div>
