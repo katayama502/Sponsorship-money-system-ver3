@@ -851,12 +851,12 @@ const App = () => {
 
                   return (
                     <div className={`rounded-[2rem] border shadow-lg overflow-hidden flex flex-col md:flex-row items-center p-8 gap-8 transition-all ${charInfo.bg} ${charInfo.border}`}>
-                      <div className="shrink-0 animate-bounce-slow bg-white/60 p-4 rounded-[2.5rem] shadow-sm transform hover:scale-105 transition-transform duration-300 flex items-center justify-center w-36 h-36">
+                      <div className="shrink-0 animate-bounce-slow bg-white/60 rounded-[2.5rem] shadow-sm transform hover:scale-105 transition-transform duration-300 flex items-center justify-center w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 relative overflow-hidden">
                         <img 
                           src={charInfo.imageUrl} 
                           alt="レベルアップキャラクター" 
-                          className="w-full h-full object-contain"
-                          onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div class="text-4xl text-slate-400 text-center font-bold">🐣<br/><span class="text-[10px]">Image Not Found</span></div>'; }}
+                          className="absolute inset-0 w-full h-full object-contain p-4 md:p-6 drop-shadow-xl"
+                          onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div class="w-full h-full flex flex-col items-center justify-center text-slate-400 text-center font-bold text-4xl">🐣<br/><span class="text-[10px]">Not Found</span></div>'; }}
                         />
                       </div>
                       <div className="flex-1 w-full space-y-4 text-center md:text-left">
