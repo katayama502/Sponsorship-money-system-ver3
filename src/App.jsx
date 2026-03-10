@@ -45,7 +45,12 @@ import {
   Building,
   Upload,
   Download,
-  FileArchive
+  FileArchive,
+  Trophy,
+  PlayCircle,
+  Crown,
+  Star,
+  Sparkles
 } from 'lucide-react';
 
 // Firebase imports
@@ -82,6 +87,24 @@ const MATERIAL_CATEGORIES = [
   { id: 'Canva', label: 'Canva' },
   { id: 'robot', label: 'Robot' }
 ];
+
+const getLevelCharacter = (percentage) => {
+  if (percentage >= 100) return { emoji: "👑", name: "プログラミング王様", color: "text-amber-500", bg: "bg-amber-100", border: "border-amber-400" };
+  if (percentage >= 80) return { emoji: "🐉", name: "つよつよドラゴン", color: "text-purple-600", bg: "bg-purple-100", border: "border-purple-400" };
+  if (percentage >= 60) return { emoji: "🦁", name: "ゆうかんなライオン", color: "text-orange-600", bg: "bg-orange-100", border: "border-orange-400" };
+  if (percentage >= 40) return { emoji: "🐑", name: "もこもここひつじ", color: "text-sky-500", bg: "bg-sky-100", border: "border-sky-400" };
+  if (percentage >= 20) return { emoji: "🐣", name: "げんきなひよこ", color: "text-yellow-600", bg: "bg-yellow-100", border: "border-yellow-400" };
+  return { emoji: "🥚", name: "はじまりのたまご", color: "text-slate-500", bg: "bg-slate-100", border: "border-slate-300" };
+};
+
+const getMaterialThumbnail = (category) => {
+  switch(category) {
+    case 'scratch': return "https://images.unsplash.com/photo-1550439062-609e1531270e?auto=format&fit=crop&q=80&w=400";
+    case 'Canva': return "https://images.unsplash.com/photo-1611532736597-de2d4265fba3?auto=format&fit=crop&q=80&w=400";
+    case 'robot': return "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&q=80&w=400";
+    default: return "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=400";
+  }
+};
 
 // --- ユーティリティ: ID・パスワード生成 ---
 const generateCredentials = () => {
@@ -436,6 +459,33 @@ const App = () => {
     window.open(m.url, '_blank');
   };
 
+  const toggleMaterialComplete = async (e, materialId) => {
+    e.stopPropagation();
+    if (!currentUser || currentUser.role !== 'student') return;
+    
+    const studentRef = doc(db, 'artifacts', appId, 'public', 'data', 'students', currentUser.studentId);
+    const studentData = students.find(s => s.id === currentUser.studentId);
+    if (!studentData) return;
+
+    const currentCompleted = studentData.completedMaterials || [];
+    const isCompleted = currentCompleted.includes(materialId);
+    
+    try {
+      const newCompleted = isCompleted 
+        ? currentCompleted.filter(id => id !== materialId)
+        : [...currentCompleted, materialId];
+        
+      await updateDoc(studentRef, { completedMaterials: newCompleted });
+      
+      setSaveMessage(isCompleted ? '未完了にもどしたよ！' : 'クリア！おめでとう！');
+      setTimeout(() => setSaveMessage(''), 3000);
+    } catch (err) {
+      console.error(err);
+      setSaveMessage('エラーが発生しました');
+      setTimeout(() => setSaveMessage(''), 3000);
+    }
+  };
+
   // --- ログイン画面 ---
   if (!currentUser || !currentUser.role) {
     return (
@@ -780,6 +830,49 @@ const App = () => {
                   </div>
                 </header>
 
+                {/* --- 新機能: キャラクターと進捗バー --- */}
+                {(() => {
+                  const loggedInStudent = currentUser.role === 'student' ? students.find(s => s.id === currentUser.studentId) : students.find(s => s.id === currentUser.childId);
+                  const completedCount = loggedInStudent?.completedMaterials?.length || 0;
+                  const totalMaterials = materials.length > 0 ? materials.length : 1;
+                  const progressPercentage = Math.min(100, Math.floor((completedCount / totalMaterials) * 100));
+                  const charInfo = getLevelCharacter(progressPercentage);
+
+                  return (
+                    <div className={`rounded-[2rem] border shadow-lg overflow-hidden flex flex-col md:flex-row items-center p-8 gap-8 transition-all ${charInfo.bg} ${charInfo.border}`}>
+                      <div className="shrink-0 animate-bounce-slow text-7xl bg-white/60 p-6 rounded-[2.5rem] shadow-sm transform hover:scale-110 transition-transform duration-300 flex items-center justify-center w-32 h-32">
+                        {charInfo.emoji}
+                      </div>
+                      <div className="flex-1 w-full space-y-4 text-center md:text-left">
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-1">現在のクラス</p>
+                          <h3 className={`text-2xl font-black flex items-center justify-center md:justify-start gap-2 ${charInfo.color}`}>
+                            {progressPercentage >= 100 ? <Crown size={24} className="text-amber-500"/> : <Sparkles size={20}/>}
+                            {charInfo.name}
+                          </h3>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center text-xs font-bold text-slate-600">
+                            <span>カリキュラム進捗</span>
+                            <span>{completedCount} / {materials.length} 完了 ({progressPercentage}%)</span>
+                          </div>
+                          <div className="w-full bg-white/50 rounded-full h-4 border border-white/40 overflow-hidden shadow-inner">
+                            <div 
+                              className="h-full rounded-full transition-all duration-1000 ease-out bg-gradient-to-r from-orange-400 to-orange-500 relative"
+                              style={{ width: `${progressPercentage}%` }}
+                            >
+                              <div className="absolute top-0 right-0 bottom-0 left-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.2)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.2)_50%,rgba(255,255,255,0.2)_75%,transparent_75%,transparent)] bg-[length:1rem_1rem] opacity-50"></div>
+                            </div>
+                          </div>
+                          <p className={`text-[10px] font-black tracking-wider text-right ${progressPercentage >= 100 ? 'text-amber-600' : 'text-slate-400'}`}>
+                            {progressPercentage >= 100 ? 'コンプリート！すごい！' : 'カリキュラムを完了してレベルアップしよう！'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* 学習記録フォーム（生徒のみ・大型・中央） */}
                 {currentUser.role === 'student' && (
                   <div className="bg-white rounded-[2rem] border border-slate-200 shadow-lg p-8 md:p-12">
@@ -948,35 +1041,87 @@ const App = () => {
             {(currentUser.role === 'student' || currentUser.role === 'parent') && activeTab === 'materials' && (
               <div className="space-y-8 text-left animate-in fade-in duration-500">
                 <header className="text-left"><h2 className="text-2xl font-black text-slate-800 tracking-tight text-left">教材・リソースライブラリ</h2></header>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                  {materials.map(m => {
-                    const isYoutube = !!getYoutubeEmbedUrl(m.url);
-                    const isScratch = m.category === 'scratch' || (m.tags && m.tags.some(t => t.toLowerCase() === 'scratch'));
+                <div className="space-y-12">
+                  {MATERIAL_CATEGORIES.map(category => {
+                    const categoryMaterials = materials.filter(m => m.category === category.id);
+                    if (categoryMaterials.length === 0) return null;
+
                     return (
-                      <div
-                        key={m.id}
-                        onClick={(e) => handleMaterialOpen(e, m)}
-                        className="bg-white p-6 rounded-[2rem] border border-slate-200 flex items-center group shadow-sm hover:shadow-md hover:border-orange-300 transition-all text-left cursor-pointer active:scale-95"
-                      >
-                        <div className="text-left w-full">
-                          <div className="flex justify-between items-center mb-2">
-                            <h4 className="font-black text-slate-800 text-lg group-hover:text-orange-600 transition-colors">{m.title}</h4>
-                            {isYoutube ? (
-                              <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-red-100 text-red-600 uppercase tracking-widest">YouTube</span>
-                            ) : isScratch ? (
-                              <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 uppercase tracking-widest">Scratch</span>
-                            ) : (
-                              <LinkIcon size={16} className="text-slate-300 group-hover:text-orange-500 transition-colors" />
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-2 text-left">
-                            <span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase text-left tracking-widest">{MATERIAL_CATEGORIES.find(c => c.id === m.category)?.label || m.category || (m.tags && m.tags[0])}</span>
-                          </div>
+                      <div key={category.id} className="space-y-6">
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-xl font-black text-slate-800 tracking-tight">{category.label}</h3>
+                          <span className="bg-slate-200 text-slate-600 text-xs font-black px-3 py-1 rounded-full">{categoryMaterials.length}</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {categoryMaterials.map(m => {
+                            const isYoutube = !!getYoutubeEmbedUrl(m.url);
+                            const isScratch = m.category === 'scratch' || (m.tags && m.tags.some(t => t.toLowerCase() === 'scratch'));
+                            const loggedInStudent = currentUser.role === 'student' ? students.find(s => s.id === currentUser.studentId) : students.find(s => s.id === currentUser.childId);
+                            const isCompleted = loggedInStudent?.completedMaterials?.includes(m.id) || false;
+
+                            return (
+                              <div
+                                key={m.id}
+                                className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden group shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col"
+                              >
+                                <div className="relative h-40 overflow-hidden cursor-pointer bg-slate-100" onClick={(e) => handleMaterialOpen(e, m)}>
+                                  <img 
+                                    src={getMaterialThumbnail(m.category)} 
+                                    alt={m.title} 
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                                  />
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                                    {isYoutube ? <PlayCircle size={48} className="text-white drop-shadow-lg" /> : <LinkIcon size={40} className="text-white drop-shadow-lg" />}
+                                  </div>
+                                  <div className="absolute top-3 left-3">
+                                    <span className={`text-[10px] shadow-sm font-black px-3 py-1 rounded-full uppercase tracking-widest ${isYoutube ? 'bg-red-500 text-white' : isScratch ? 'bg-orange-500 text-white' : 'bg-slate-800 text-white'}`}>
+                                      {isYoutube ? 'YouTube' : isScratch ? 'Scratch' : 'Web'}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="p-5 flex-1 flex flex-col">
+                                  <h4 
+                                    className="font-black text-slate-800 text-lg mb-4 flex-1 cursor-pointer hover:text-orange-600 transition-colors line-clamp-2"
+                                    onClick={(e) => handleMaterialOpen(e, m)}
+                                  >
+                                    {m.title}
+                                  </h4>
+                                  
+                                  {currentUser.role === 'student' && (
+                                    <button
+                                      onClick={(e) => toggleMaterialComplete(e, m.id)}
+                                      className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest transition-all duration-300 ${
+                                        isCompleted 
+                                          ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 border border-emerald-200 shadow-inner' 
+                                          : 'bg-slate-100 text-slate-500 hover:bg-orange-600 hover:text-white border border-slate-200 hover:border-transparent hover:shadow-lg'
+                                      }`}
+                                    >
+                                      {isCompleted ? <CheckCircle2 size={18} /> : <Star size={18} />}
+                                      {isCompleted ? '完了！クリア' : 'カリキュラムを完了'}
+                                    </button>
+                                  )}
+                                  {currentUser.role === 'parent' && (
+                                    <div className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest border ${
+                                      isCompleted ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'
+                                    }`}>
+                                      {isCompleted ? <CheckCircle2 size={18} /> : <div className="w-2 h-2 rounded-full bg-slate-300" />}
+                                      {isCompleted ? '学習完了済' : '未完了'}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     );
                   })}
-                  {materials.length === 0 && <div className="md:col-span-2 py-20 bg-white rounded-3xl border border-dashed border-slate-200 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">現在、公開されている教材はありません</div>}
+                  
+                  {materials.length === 0 && (
+                    <div className="py-20 bg-white rounded-3xl border border-dashed border-slate-200 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">
+                      現在、公開されている教材はありません
+                    </div>
+                  )}
                 </div>
               </div>
             )}
