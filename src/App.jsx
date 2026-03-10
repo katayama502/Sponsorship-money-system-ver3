@@ -50,7 +50,8 @@ import {
   PlayCircle,
   Crown,
   Star,
-  Sparkles
+  Sparkles,
+  Menu
 } from 'lucide-react';
 
 // Firebase imports
@@ -122,6 +123,7 @@ const App = () => {
   // --- UI State ---
   const [activeTab, setActiveTab] = useState('students');
   const [saveMessage, setSaveMessage] = useState('');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // --- Data State ---
   const [students, setStudents] = useState([]);
@@ -593,18 +595,32 @@ const App = () => {
 
       {/* --- Admin Layout --- */}
       {currentUser.role === 'admin' && (
-        <div className="flex h-screen overflow-hidden">
-          <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col transition-all shrink-0">
-            <div className="h-16 flex items-center px-6 bg-slate-950 font-black tracking-widest text-white uppercase border-b border-slate-800">
-              <Calculator size={18} className="text-orange-500 mr-2" /> Clayette Admin
+        <div className="flex h-screen overflow-hidden relative">
+          {/* Mobile Overlay */}
+          {isMobileMenuOpen && (
+            <div 
+              className="fixed inset-0 bg-slate-900/50 z-40 md:hidden"
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+          )}
+
+          <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-300 flex flex-col transition-transform duration-300 ease-in-out shrink-0 md:static md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            <div className="h-16 flex items-center justify-between px-6 bg-slate-950 border-b border-slate-800">
+              <span className="font-black tracking-widest text-white uppercase flex items-center"><Calculator size={18} className="text-orange-500 mr-2" /> Clayette Admin</span>
+              <button 
+                className="md:hidden text-slate-400 hover:text-white"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <X size={20} />
+              </button>
             </div>
             <div className="flex-1 overflow-y-auto py-6 space-y-2 px-4">
-              <button onClick={() => setActiveTab('students')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'students' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><Users size={18} /> 受講生一覧</button>
-              <button onClick={() => setActiveTab('records')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'records' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><FileText size={18} /> 提出シート確認</button>
-              <button onClick={() => setActiveTab('materials')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'materials' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><BookOpen size={18} /> 教材リソース</button>
-              <button onClick={() => setActiveTab('approvals')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'approvals' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><CheckCircle2 size={18} /> カリキュラム承認</button>
-              <button onClick={() => setActiveTab('reflections')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'reflections' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><Settings2 size={18} /> 記録フォーマット</button>
-              <button onClick={() => setActiveTab('notices')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'notices' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><Megaphone size={18} /> 全体お知らせ</button>
+              <button onClick={() => { setActiveTab('students'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'students' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><Users size={18} /> 受講生一覧</button>
+              <button onClick={() => { setActiveTab('records'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'records' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><FileText size={18} /> 提出シート確認</button>
+              <button onClick={() => { setActiveTab('materials'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'materials' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><BookOpen size={18} /> 教材リソース</button>
+              <button onClick={() => { setActiveTab('approvals'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'approvals' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><CheckCircle2 size={18} /> カリキュラム承認</button>
+              <button onClick={() => { setActiveTab('reflections'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'reflections' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><Settings2 size={18} /> 記録フォーマット</button>
+              <button onClick={() => { setActiveTab('notices'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'notices' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><Megaphone size={18} /> 全体お知らせ</button>
             </div>
             <div className="p-4 border-t border-slate-800">
               <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold hover:bg-slate-800 text-rose-400 rounded-xl transition-all"><LogOut size={18} /> ログアウト</button>
@@ -612,9 +628,19 @@ const App = () => {
           </aside>
 
           <main className="flex-1 flex flex-col min-w-0 bg-slate-50 overflow-hidden">
-            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
-              <h1 className="text-lg font-black text-slate-800 uppercase tracking-widest">Dashboard</h1>
-              <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-black text-xs">AD</div></div>
+            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-8 shrink-0">
+              <div className="flex items-center gap-3">
+                <button 
+                  className="md:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                  onClick={() => setIsMobileMenuOpen(true)}
+                >
+                  <Menu size={20} />
+                </button>
+                <h1 className="text-lg font-black text-slate-800 uppercase tracking-widest hidden sm:block">Dashboard</h1>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-black text-xs">AD</div>
+              </div>
             </header>
             <div className="flex-1 overflow-y-auto p-4 md:p-8">
               {saveMessage && <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce text-left"><CheckCircle2 size={18} className="text-emerald-400" /><span className="text-sm font-bold">{saveMessage}</span></div>}
@@ -879,15 +905,29 @@ const App = () => {
 
       {/* --- Student / Parent Layout --- */}
       {(currentUser.role === 'student' || currentUser.role === 'parent') && (
-        <div className="flex flex-col min-h-screen bg-[#FFFDF8] w-full">
+        <div className="flex flex-col min-h-screen bg-[#FFFDF8] w-full relative">
+          {/* Mobile Overlay */}
+          {isMobileMenuOpen && (
+            <div 
+              className="fixed inset-0 bg-slate-900/50 z-40 md:hidden"
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+          )}
+
           {/* ポップで親しみやすいヘッダー */}
-          <nav className="bg-white border-b-4 border-orange-400 sticky top-0 z-40 px-4 shrink-0 shadow-sm">
+          <nav className="bg-white border-b-4 border-orange-400 sticky top-0 z-40 px-4 shrink-0 shadow-sm transition-all duration-300">
             <div className="max-w-4xl mx-auto flex items-center justify-between h-20">
               <div className="flex items-center gap-3">
-                <div className="bg-orange-500 p-2.5 rounded-2xl text-white shadow-md transform -rotate-3"><Calculator size={24} /></div>
+                <button 
+                  className="md:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                  onClick={() => setIsMobileMenuOpen(true)}
+                >
+                  <Menu size={24} />
+                </button>
+                <div className="bg-orange-500 p-2.5 rounded-2xl text-white shadow-md transform -rotate-3 hidden sm:block"><Calculator size={24} /></div>
                 <span className="font-black text-xl tracking-tight text-slate-800">クリエット！</span>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="hidden md:flex items-center gap-3">
                 <div className="flex gap-2 bg-slate-100/50 p-1.5 rounded-2xl">
                   <button onClick={() => setActiveTab('mypage')} className={`px-4 py-2 rounded-xl text-sm font-black transition-all ${activeTab === 'mypage' ? 'bg-orange-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}>マイページ</button>
                   <button onClick={() => setActiveTab('materials')} className={`px-4 py-2 rounded-xl text-sm font-black transition-all ${activeTab === 'materials' ? 'bg-sky-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}>きょうざいを見る</button>
@@ -896,6 +936,23 @@ const App = () => {
               </div>
             </div>
           </nav>
+
+          {/* Mobile Menu Sidebar */}
+          <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 shadow-xl flex flex-col transition-transform duration-300 ease-in-out md:hidden ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            <div className="h-20 flex items-center justify-between px-6 border-b border-slate-100">
+               <span className="font-black text-xl tracking-tight text-slate-800 flex items-center gap-2"><div className="bg-orange-500 p-2 rounded-xl text-white shadow-sm transform -rotate-3"><Calculator size={20} /></div>クリエット！</span>
+              <button className="text-slate-400 hover:text-slate-600 bg-slate-50 p-2 rounded-xl" onClick={() => setIsMobileMenuOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
+               <button onClick={() => { setActiveTab('mypage'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'mypage' ? 'bg-orange-100 text-orange-600' : 'text-slate-500 hover:bg-slate-50'}`}>マイページ</button>
+               <button onClick={() => { setActiveTab('materials'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'materials' ? 'bg-sky-100 text-sky-600' : 'text-slate-500 hover:bg-slate-50'}`}>きょうざいを見る</button>
+            </div>
+            <div className="p-4 border-t border-slate-100">
+              <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-black hover:bg-slate-50 text-rose-500 rounded-xl transition-all"><LogOut size={18} /> ログアウト</button>
+            </div>
+          </aside>
 
           <main className="flex-grow max-w-4xl w-full mx-auto p-4 md:p-6 space-y-8 text-left text-slate-900">
             {saveMessage && <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce text-left"><CheckCircle2 size={18} className="text-emerald-400" /><span className="text-sm font-bold">{saveMessage}</span></div>}
