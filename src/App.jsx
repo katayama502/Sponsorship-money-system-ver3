@@ -628,27 +628,118 @@ const App = () => {
         {/* 振り返り項目管理 */}
         {currentUser.role === 'admin' && activeTab === 'reflections' && (
           <div className="space-y-8 animate-in fade-in duration-500 text-left">
-            <header className="text-left font-black text-2xl text-left text-slate-800">振り返り項目設定</header>
+            <header className="text-left font-black text-2xl text-left text-slate-800">記録フォーマット項目設定</header>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
               <div className="md:col-span-1 bg-white p-6 rounded-3xl border border-slate-200 h-fit shadow-sm text-left">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 text-left">新規項目追加</h3>
                 <form onSubmit={saveReflectionItem} className="space-y-4 text-left">
+                  <select value={reflectionItemForm.category} onChange={e => setReflectionItemForm({ ...reflectionItemForm, category: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500 appearance-none">
+                    <option value="goal">目標シート (授業前)</option>
+                    <option value="reflection">振り返りシート (授業後)</option>
+                  </select>
                   <input type="text" required placeholder="項目名 (例: 今日の目標)" value={reflectionItemForm.title} onChange={e => setReflectionItemForm({ ...reflectionItemForm, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" />
                   <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg hover:bg-orange-600 transition-all uppercase tracking-[0.2em] text-sm">追加</button>
                 </form>
               </div>
               <div className="md:col-span-2 space-y-4 text-left">
-                {reflectionTemplate.map((item, idx) => (
-                  <div key={item.id} className="bg-white p-5 rounded-2xl border border-slate-200 flex justify-between items-center shadow-sm text-left">
-                    <div className="flex gap-4 items-center">
-                      <span className="text-xl font-black text-slate-200">{idx + 1}</span>
-                      <h4 className="font-bold text-base text-slate-800">{item.title}</h4>
+                {['goal', 'reflection'].map(category => (
+                  <div key={category} className="mb-6 border-b border-slate-100 pb-4">
+                    <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-4">{category === 'goal' ? '目標シート (授業前)' : '振り返りシート (授業後)'}</h3>
+                    <div className="space-y-3">
+                      {reflectionTemplate.filter(i => i.category === category).map((item, idx) => (
+                        <div key={item.id} className="bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-center shadow-sm text-left">
+                          <div className="flex gap-4 items-center">
+                            <span className="text-xl font-black text-slate-200">{idx + 1}</span>
+                            <h4 className="font-bold text-sm text-slate-800">{item.title}</h4>
+                          </div>
+                          <button onClick={() => deleteReflectionItem(item.id)} className="text-slate-300 hover:text-rose-500 transition-colors p-2"><Trash2 size={16} /></button>
+                        </div>
+                      ))}
+                      {reflectionTemplate.filter(i => i.category === category).length === 0 && <p className="text-slate-400 text-xs font-bold py-4 pl-2">項目がまだありません</p>}
                     </div>
-                    <button onClick={() => deleteReflectionItem(item.id)} className="text-slate-300 hover:text-rose-500 transition-colors p-2"><Trash2 size={18} /></button>
                   </div>
                 ))}
-                {reflectionTemplate.length === 0 && <p className="text-slate-400 text-sm font-bold py-10 text-center">項目がまだありません</p>}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 先生の確認・コメント一覧（管理者側） */}
+        {currentUser.role === 'admin' && activeTab === 'records' && (
+          <div className="space-y-8 animate-in fade-in duration-500 text-left">
+            <header className="flex justify-between items-end">
+              <div>
+                <h2 className="text-2xl font-black tracking-tight text-left text-slate-800">生徒の提出シート一覧</h2>
+              </div>
+            </header>
+
+            <div className="space-y-6">
+              {learningRecords.length === 0 ? (
+                <div className="bg-white rounded-3xl border border-dashed border-slate-200 p-20 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">提出記録はありません</div>
+              ) : (
+                learningRecords.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()).map(record => (
+                  <div key={record.id} className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm text-left p-6 md:p-8">
+                    <div className="flex flex-col md:flex-row gap-6">
+                      <div className="flex-1 space-y-4">
+                        <div className="flex items-center gap-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black tracking-widest uppercase ${record.recordType === 'goal' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600'}`}>
+                            {record.recordType === 'goal' ? '目標シート' : '振り返りシート'}
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400">{new Date(record.date).toLocaleDateString()}</span>
+                        </div>
+                        <h4 className="text-xl font-black text-slate-800">{record.title} <span className="text-sm font-medium text-slate-400 ml-2">by {record.studentName}</span></h4>
+
+                        {/* 回答の表示ロジックは生徒側と同じ */}
+                        <div className="space-y-3 bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                          {typeof record.content === 'object' ? (
+                            Object.keys(record.content).map(key => {
+                              const templateItem = reflectionTemplate.find(t => t.id === key);
+                              return record.content[key] ? (
+                                <div key={key}>
+                                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{templateItem ? templateItem.title : key}</h5>
+                                  <p className="text-sm text-slate-700 font-medium whitespace-pre-wrap">{record.content[key]}</p>
+                                </div>
+                              ) : null;
+                            })
+                          ) : (
+                            <p className="text-sm text-slate-700 font-medium whitespace-pre-wrap">{record.content}</p>
+                          )}
+
+                          {record.linkUrl && (
+                            <div className="mt-4 flex items-center gap-2 pt-3 border-t border-slate-200">
+                              <LinkIcon size={14} className="text-orange-500" />
+                              <a href={record.linkUrl} target="_blank" className="text-xs font-bold text-orange-600 hover:underline">作品リンク</a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="md:w-80 shrink-0 bg-[#FFF5F0] rounded-2xl p-5 border border-orange-100 flex flex-col justify-between">
+                        <div>
+                          <h5 className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-3 flex items-center gap-1.5"><MessageSquare size={12} /> 講師コメント</h5>
+                          {record.comment ? (
+                            <p className="text-sm font-bold text-slate-700 leading-relaxed italic mb-4">"{record.comment}"</p>
+                          ) : null}
+                        </div>
+                        <div className="mt-auto">
+                          <textarea
+                            placeholder="コメントを入力..."
+                            value={adminComment[record.id] || ''}
+                            onChange={e => setAdminComment({ ...adminComment, [record.id]: e.target.value })}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium h-20 resize-none outline-none focus:ring-2 focus:ring-orange-500 mb-2"
+                          />
+                          <button
+                            onClick={() => submitAdminComment(record.id)}
+                            className="w-full bg-slate-900 text-white text-[10px] font-black py-2.5 rounded-xl transition-all hover:bg-orange-600 active:scale-95 uppercase tracking-widest"
+                          >
+                            送信する
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -669,29 +760,50 @@ const App = () => {
             {/* 学習記録フォーム（生徒のみ・大型・中央） */}
             {currentUser.role === 'student' && (
               <div className="bg-white rounded-[2rem] border border-slate-200 shadow-lg p-8 md:p-12">
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="bg-orange-600 p-3 rounded-2xl text-white shadow-lg"><BookOpen size={22} /></div>
-                  <div>
-                    <h3 className="text-xl font-black text-slate-800">学習を記録する</h3>
-                    <p className="text-xs text-slate-400 font-medium mt-0.5">今日学んだことや感想を書いて保存しましょう</p>
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-orange-600 p-3 rounded-2xl text-white shadow-lg"><BookOpen size={22} /></div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-800">学習を記録する</h3>
+                      <p className="text-xs text-slate-400 font-medium mt-0.5">今日の目標や振り返りを書いて保存しましょう</p>
+                    </div>
+                  </div>
+
+                  {/* シート切り替え */}
+                  <div className="flex bg-slate-100 p-1.5 rounded-2xl">
+                    <button
+                      type="button"
+                      onClick={() => setNewLearningRecord({ ...newLearningRecord, recordType: 'goal', content: newLearningRecord.goalContent || {} })}
+                      className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${newLearningRecord.recordType === 'goal' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      目標シート (前)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewLearningRecord({ ...newLearningRecord, recordType: 'reflection', goalContent: newLearningRecord.content, content: newLearningRecord.reflectionContent || {} })}
+                      className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${newLearningRecord.recordType === 'reflection' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      振り返りシート (後)
+                    </button>
                   </div>
                 </div>
+
                 <form onSubmit={submitLearningRecord} className="space-y-6">
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">タイトル</label>
-                    <input type="text" value={newLearningRecord.title} onChange={e => setNewLearningRecord({ ...newLearningRecord, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-base font-bold outline-none focus:ring-2 focus:ring-orange-500 transition-all" placeholder="例: Scratchでアニメーションを作った！" required />
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">タイトル ({newLearningRecord.recordType === 'goal' ? '目標のタイトル' : '振り返りのタイトル'})</label>
+                    <input type="text" value={newLearningRecord.title} onChange={e => setNewLearningRecord({ ...newLearningRecord, title: e.target.value })} className={`w-full bg-slate-50 border rounded-2xl px-5 py-4 text-base font-bold outline-none transition-all ${newLearningRecord.recordType === 'goal' ? 'border-emerald-100 focus:ring-emerald-500' : 'border-slate-200 focus:ring-orange-500'}`} placeholder={newLearningRecord.recordType === 'goal' ? "例: 今日はScratchでゲームを完成させる！" : "例: Scratchでアニメーションを作った！"} required />
                   </div>
-                  {reflectionTemplate.length > 0 ? (
-                    reflectionTemplate.map(item => (
+                  {reflectionTemplate.filter(i => i.category === newLearningRecord.recordType).length > 0 ? (
+                    reflectionTemplate.filter(i => i.category === newLearningRecord.recordType).map(item => (
                       <div key={item.id}>
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">{item.title}</label>
-                        <textarea value={newLearningRecord.content[item.id] || ''} onChange={e => setNewLearningRecord({ ...newLearningRecord, content: { ...newLearningRecord.content, [item.id]: e.target.value } })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-medium h-24 resize-none focus:ring-2 focus:ring-orange-500 outline-none transition-all leading-relaxed" placeholder={`${item.title}を入力してください`} required />
+                        <textarea value={newLearningRecord.content[item.id] || ''} onChange={e => setNewLearningRecord({ ...newLearningRecord, content: { ...newLearningRecord.content, [item.id]: e.target.value } })} className={`w-full bg-slate-50 border rounded-2xl px-5 py-4 text-sm font-medium h-24 resize-none outline-none transition-all leading-relaxed ${newLearningRecord.recordType === 'goal' ? 'border-emerald-100 focus:ring-emerald-500' : 'border-slate-200 focus:ring-orange-500'}`} placeholder={`${item.title}を入力してください`} required />
                       </div>
                     ))
                   ) : (
                     <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">今日学んだこと・感想</label>
-                      <textarea value={newLearningRecord.content['default'] || ''} onChange={e => setNewLearningRecord({ ...newLearningRecord, content: { ...newLearningRecord.content, default: e.target.value } })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-medium h-48 resize-none focus:ring-2 focus:ring-orange-500 outline-none transition-all leading-relaxed" placeholder="今日はどんなことを学びましたか？難しかったこと、面白かったことを書いてみましょう。" required />
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">{newLearningRecord.recordType === 'goal' ? '今日の目標・やりたいこと' : '今日学んだこと・感想'}</label>
+                      <textarea value={newLearningRecord.content['default'] || ''} onChange={e => setNewLearningRecord({ ...newLearningRecord, content: { ...newLearningRecord.content, default: e.target.value } })} className={`w-full bg-slate-50 border rounded-2xl px-5 py-4 text-sm font-medium h-48 resize-none outline-none transition-all leading-relaxed ${newLearningRecord.recordType === 'goal' ? 'border-emerald-100 focus:ring-emerald-500' : 'border-slate-200 focus:ring-orange-500'}`} placeholder={newLearningRecord.recordType === 'goal' ? "今日はどんなことを学びたいですか？" : "今日はどんなことを学びましたか？難しかったこと、面白かったことを書いてみましょう。"} required />
                     </div>
                   )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -704,8 +816,8 @@ const App = () => {
                       <input type="url" placeholder="https://..." value={newLearningRecord.linkUrl} onChange={e => setNewLearningRecord({ ...newLearningRecord, linkUrl: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500 transition-all" />
                     </div>
                   </div>
-                  <button type="submit" className="w-full bg-orange-600 text-white font-black py-5 rounded-2xl shadow-xl hover:bg-orange-700 transition-all flex items-center justify-center gap-3 active:scale-95 text-base uppercase tracking-widest">
-                    <Save size={20} /> 記録を保存する
+                  <button type="submit" className={`w-full text-white font-black py-5 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-3 active:scale-95 text-base uppercase tracking-widest ${newLearningRecord.recordType === 'goal' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-orange-600 hover:bg-orange-700'}`}>
+                    <Save size={20} /> {newLearningRecord.recordType === 'goal' ? '目標を保存する' : '振り返りを保存する'}
                   </button>
                 </form>
               </div>
@@ -760,18 +872,23 @@ const App = () => {
               <div className="grid grid-cols-1 gap-6">
                 {learningRecords.length === 0
                   ? <div className="bg-white rounded-3xl border border-dashed border-slate-200 p-20 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">記録が見つかりません</div>
-                  : learningRecords.sort((a, b) => b.date.localeCompare(a.date)).map(record => (
+                  : learningRecords.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()).map(record => (
                     <div key={record.id} className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden flex flex-col md:flex-row shadow-sm hover:shadow-md transition-all group">
                       {record.imageUrl && (
                         <div className="md:w-72 h-56 md:h-auto bg-slate-100 flex-shrink-0 overflow-hidden"><img src={record.imageUrl} alt="成果物" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?auto=format&fit=crop&q=80&w=400'; }} /></div>
                       )}
                       <div className="p-8 flex-1 space-y-5">
-                        <div><p className="text-[10px] font-black text-orange-600 uppercase tracking-[0.2em] mb-1">{new Date(record.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}</p><h4 className="text-2xl font-black text-slate-800 tracking-tight">{record.title}</h4></div>
+                        <div>
+                          <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${record.recordType === 'goal' ? 'text-emerald-600' : 'text-orange-600'}`}>
+                            {new Date(record.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}  |  {record.recordType === 'goal' ? '目標シート' : '振り返りシート'}
+                          </p>
+                          <h4 className="text-2xl font-black text-slate-800 tracking-tight">{record.title}</h4>
+                        </div>
 
                         {/* 記録内容の表示 */}
                         {typeof record.content === 'object' ? (
-                          reflectionTemplate.length > 0 ? (
-                            reflectionTemplate.map(item => record.content[item.id] && (
+                          reflectionTemplate.filter(i => i.category === record.recordType).length > 0 ? (
+                            reflectionTemplate.filter(i => i.category === record.recordType).map(item => record.content[item.id] && (
                               <div key={item.id} className="mt-4">
                                 <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{item.title}</h5>
                                 <p className="text-sm text-slate-600 leading-relaxed font-medium whitespace-pre-wrap bg-slate-50 p-4 rounded-xl">{record.content[item.id]}</p>
@@ -789,12 +906,12 @@ const App = () => {
                         {/* リンク・ファイルの表示 */}
                         {record.linkUrl && (
                           <div className="mt-4 flex items-center gap-2">
-                            <LinkIcon size={16} className="text-orange-500" />
-                            <a href={record.linkUrl} target="_blank" className="text-sm font-bold text-orange-600 hover:underline">作品リンクを見る</a>
+                            <LinkIcon size={16} className={record.recordType === 'goal' ? 'text-emerald-500' : 'text-orange-500'} />
+                            <a href={record.linkUrl} target="_blank" className={`text-sm font-bold hover:underline ${record.recordType === 'goal' ? 'text-emerald-600' : 'text-orange-600'}`}>作品リンクを見る</a>
                           </div>
                         )}
 
-                        {record.comment && <div className="mt-4 bg-orange-50/70 border border-orange-100 p-5 rounded-2xl"><div className="flex items-center gap-2 text-orange-600 font-black text-[10px] uppercase tracking-widest mb-2"><MessageSquare size={12} /> Feedback</div><p className="text-sm text-slate-700 font-bold italic leading-relaxed">"{record.comment}"</p></div>}
+                        {record.comment && <div className={`mt-4 border p-5 rounded-2xl ${record.recordType === 'goal' ? 'bg-emerald-50/70 border-emerald-100' : 'bg-orange-50/70 border-orange-100'}`}><div className={`flex items-center gap-2 font-black text-[10px] uppercase tracking-widest mb-2 ${record.recordType === 'goal' ? 'text-emerald-600' : 'text-orange-600'}`}><MessageSquare size={12} /> 講師コメント</div><p className="text-sm text-slate-700 font-bold italic leading-relaxed">"{record.comment}"</p></div>}
                       </div>
                     </div>
                   ))
