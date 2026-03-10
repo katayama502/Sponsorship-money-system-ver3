@@ -155,6 +155,7 @@ const App = () => {
   const [activeWorkspace, setActiveWorkspace] = useState(null);
   const [splitRatio, setSplitRatio] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
+  const [completionRequests, setCompletionRequests] = useState([]);
 
   // --- YouTube モーダル ---
   const [youtubeModal, setYoutubeModal] = useState(null); // { title, embedUrl }
@@ -234,6 +235,9 @@ const App = () => {
     const unsubReflections = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'reflection_template'), (snap) => {
       setReflectionTemplate(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)));
     });
+    const unsubCompletionRequests = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'completion_requests'), (snap) => {
+      setCompletionRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)));
+    });
 
     // .sb3ファイルのリスナー (ログインした生徒のファイルのみ)
     if (currentUser.role === 'student' && currentUser.studentId) {
@@ -245,14 +249,14 @@ const App = () => {
       );
       return () => {
         unsubStudents(); unsubAnnounce();
-        unsubLearning(); unsubMaterials(); unsubReflections();
+        unsubLearning(); unsubMaterials(); unsubReflections(); unsubCompletionRequests();
         unsubSb3();
       };
     }
 
     return () => {
       unsubStudents(); unsubAnnounce();
-      unsubLearning(); unsubMaterials(); unsubReflections();
+      unsubLearning(); unsubMaterials(); unsubReflections(); unsubCompletionRequests();
     };
   }, [currentUser]);
 
@@ -462,25 +466,51 @@ const App = () => {
     e.stopPropagation();
     if (!currentUser || currentUser.role !== 'student') return;
     
-    const studentRef = doc(db, 'artifacts', appId, 'public', 'data', 'students', currentUser.studentId);
-    const studentData = students.find(s => s.id === currentUser.studentId);
-    if (!studentData) return;
-
-    const currentCompleted = studentData.completedMaterials || [];
-    const isCompleted = currentCompleted.includes(materialId);
+    // Check if a request already exists
+    const existingReq = completionRequests.find(r => r.studentId === currentUser.studentId && r.materialId === materialId && r.status === 'pending');
+    if (existingReq) return; // Already requested
     
     try {
-      const newCompleted = isCompleted 
-        ? currentCompleted.filter(id => id !== materialId)
-        : [...currentCompleted, materialId];
-        
-      await updateDoc(studentRef, { completedMaterials: newCompleted });
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'completion_requests'), {
+        studentId: currentUser.studentId,
+        studentName: currentUser.name,
+        materialId: materialId,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
       
-      setSaveMessage(isCompleted ? '未完了にもどしたよ！' : 'クリア！おめでとう！');
+      setSaveMessage('先生に完了の報告をしました！');
       setTimeout(() => setSaveMessage(''), 3000);
     } catch (err) {
       console.error(err);
       setSaveMessage('エラーが発生しました');
+      setTimeout(() => setSaveMessage(''), 3000);
+    }
+  };
+
+  const approveCompletion = async (requestId, studentId, materialId) => {
+    try {
+      // 1. Update the request status
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'completion_requests', requestId), {
+        status: 'approved',
+        approvedAt: serverTimestamp()
+      });
+
+      // 2. Update the student's completed materials
+      const studentData = students.find(s => s.id === studentId);
+      if (studentData) {
+        const currentCompleted = studentData.completedMaterials || [];
+        if (!currentCompleted.includes(materialId)) {
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', studentId), {
+            completedMaterials: [...currentCompleted, materialId]
+          });
+        }
+      }
+      setSaveMessage('完了を承認しました');
+      setTimeout(() => setSaveMessage(''), 3000);
+    } catch (err) {
+      console.error(err);
+      setSaveMessage('承認に失敗しました');
       setTimeout(() => setSaveMessage(''), 3000);
     }
   };
@@ -572,6 +602,7 @@ const App = () => {
               <button onClick={() => setActiveTab('students')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'students' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><Users size={18} /> 受講生一覧</button>
               <button onClick={() => setActiveTab('records')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'records' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><FileText size={18} /> 提出シート確認</button>
               <button onClick={() => setActiveTab('materials')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'materials' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><BookOpen size={18} /> 教材リソース</button>
+              <button onClick={() => setActiveTab('approvals')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'approvals' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><CheckCircle2 size={18} /> カリキュラム承認</button>
               <button onClick={() => setActiveTab('reflections')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'reflections' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><Settings2 size={18} /> 記録フォーマット</button>
               <button onClick={() => setActiveTab('notices')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'notices' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><Megaphone size={18} /> 全体お知らせ</button>
             </div>
@@ -587,6 +618,47 @@ const App = () => {
             </header>
             <div className="flex-1 overflow-y-auto p-4 md:p-8">
               {saveMessage && <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce text-left"><CheckCircle2 size={18} className="text-emerald-400" /><span className="text-sm font-bold">{saveMessage}</span></div>}
+
+              {/* カリキュラム承認 */}
+              {currentUser.role === 'admin' && activeTab === 'approvals' && (
+                <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500 text-left">
+                  <header className="flex justify-between items-center text-left">
+                    <h2 className="text-2xl font-black tracking-tight text-left">カリキュラム承認待ち一覧</h2>
+                  </header>
+
+                  <div className="space-y-4">
+                    {completionRequests.filter(req => req.status === 'pending').map(req => {
+                      const material = materials.find(m => m.id === req.materialId);
+                      return (
+                        <div key={req.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                          <div>
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="bg-orange-100 text-orange-600 px-3 py-1 rounded-full text-xs font-bold">{req.studentName}</span>
+                              <span className="text-slate-400 text-xs">{req.createdAt?.toDate().toLocaleString('ja-JP')}</span>
+                            </div>
+                            <h3 className="font-bold text-lg text-slate-800">
+                              教材: {material ? material.title : '不明な教材'}
+                            </h3>
+                          </div>
+                          <button
+                            onClick={() => approveCompletion(req.id, req.studentId, req.materialId)}
+                            className="shrink-0 bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-md"
+                          >
+                            <CheckCircle2 size={18} /> 承認する
+                          </button>
+                        </div>
+                      );
+                    })}
+
+                    {completionRequests.filter(req => req.status === 'pending').length === 0 && (
+                      <div className="py-20 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
+                        <CheckCircle2 size={48} className="mx-auto text-slate-300 mb-4" />
+                        <p className="text-slate-500 font-bold">現在、承認待ちのカリキュラムはありません。</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* 生徒管理 */}
               {currentUser.role === 'admin' && activeTab === 'students' && (
@@ -1106,19 +1178,42 @@ const App = () => {
                                     {m.title}
                                   </h4>
                                   
-                                  {currentUser.role === 'student' && (
-                                    <button
-                                      onClick={(e) => toggleMaterialComplete(e, m.id)}
-                                      className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest transition-all duration-300 ${
-                                        isCompleted 
-                                          ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 border border-emerald-200 shadow-inner' 
-                                          : 'bg-slate-100 text-slate-500 hover:bg-orange-600 hover:text-white border border-slate-200 hover:border-transparent hover:shadow-lg'
-                                      }`}
-                                    >
-                                      {isCompleted ? <CheckCircle2 size={18} /> : <Star size={18} />}
-                                      {isCompleted ? '完了！クリア' : 'カリキュラムを完了'}
-                                    </button>
-                                  )}
+                                  {currentUser.role === 'student' && (() => {
+                                    const hasPending = completionRequests.some(r => r.studentId === currentUser.studentId && r.materialId === m.id && r.status === 'pending');
+                                    let buttonState = {
+                                      bg: 'bg-slate-100 text-slate-500 hover:bg-orange-600 hover:text-white border border-slate-200 hover:border-transparent hover:shadow-lg',
+                                      icon: <Star size={18} />,
+                                      text: 'カリキュラムを完了',
+                                      disabled: false
+                                    };
+                                    
+                                    if (isCompleted) {
+                                      buttonState = {
+                                        bg: 'bg-emerald-100 text-emerald-600 border border-emerald-200 shadow-inner cursor-default',
+                                        icon: <CheckCircle2 size={18} />,
+                                        text: '完了！クリア',
+                                        disabled: true
+                                      };
+                                    } else if (hasPending) {
+                                      buttonState = {
+                                        bg: 'bg-amber-100 text-amber-600 border border-amber-200 shadow-inner cursor-default',
+                                        icon: <Clock size={18} />,
+                                        text: '承認待ち',
+                                        disabled: true
+                                      };
+                                    }
+
+                                    return (
+                                      <button
+                                        onClick={(e) => { if (!buttonState.disabled) toggleMaterialComplete(e, m.id) }}
+                                        disabled={buttonState.disabled}
+                                        className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest transition-all duration-300 ${buttonState.bg}`}
+                                      >
+                                        {buttonState.icon}
+                                        {buttonState.text}
+                                      </button>
+                                    );
+                                  })()}
                                   {currentUser.role === 'parent' && (
                                     <div className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest border ${
                                       isCompleted ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'
