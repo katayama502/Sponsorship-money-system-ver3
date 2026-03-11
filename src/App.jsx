@@ -143,7 +143,8 @@ const App = () => {
   const [adminComment, setAdminComment] = useState({});
   const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', type: 'info' });
   const [reflectionTemplate, setReflectionTemplate] = useState([]);
-  const [reflectionItemForm, setReflectionItemForm] = useState({ title: '', type: 'textarea' });
+  const [reflectionItemForm, setReflectionItemForm] = useState({ title: '', type: 'textarea', category: 'goal' });
+  const [editingReflectionItem, setEditingReflectionItem] = useState(null);
 
   // --- .sb3 アップロード ---
   const [sb3Files, setSb3Files] = useState([]);
@@ -399,11 +400,20 @@ const App = () => {
   const saveReflectionItem = async (e) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reflection_template'), {
-        ...reflectionItemForm, createdAt: serverTimestamp()
-      });
-      setReflectionItemForm({ title: '', type: 'textarea' });
-      setSaveMessage('項目を追加しました');
+      const dataToSave = { ...reflectionItemForm, category: reflectionItemForm.category || 'goal' };
+      if (editingReflectionItem) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reflection_template', editingReflectionItem), {
+          ...dataToSave, updatedAt: serverTimestamp()
+        });
+        setSaveMessage('項目を更新しました');
+        setEditingReflectionItem(null);
+      } else {
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reflection_template'), {
+          ...dataToSave, createdAt: serverTimestamp()
+        });
+        setSaveMessage('項目を追加しました');
+      }
+      setReflectionItemForm({ title: '', type: 'textarea', category: 'goal' });
     } catch (e) { setSaveMessage('エラー'); }
     setTimeout(() => setSaveMessage(''), 3000);
   };
@@ -412,6 +422,10 @@ const App = () => {
     if (!window.confirm('削除しますか？')) return;
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reflection_template', id));
+      if (editingReflectionItem === id) {
+        setEditingReflectionItem(null);
+        setReflectionItemForm({ title: '', type: 'textarea', category: 'goal' });
+      }
       setSaveMessage('削除しました');
     } catch (e) { }
     setTimeout(() => setSaveMessage(''), 3000);
@@ -786,14 +800,17 @@ const App = () => {
                   <header className="text-left font-black text-2xl text-left text-slate-800">記録フォーマット項目設定</header>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
                     <div className="md:col-span-1 bg-white p-6 rounded-3xl border border-slate-200 h-fit shadow-sm text-left">
-                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 text-left">新規項目追加</h3>
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 text-left">{editingReflectionItem ? '項目を編集' : '新規項目追加'}</h3>
                       <form onSubmit={saveReflectionItem} className="space-y-4 text-left">
-                        <select value={reflectionItemForm.category} onChange={e => setReflectionItemForm({ ...reflectionItemForm, category: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500 appearance-none">
+                        <select value={reflectionItemForm.category || 'goal'} onChange={e => setReflectionItemForm({ ...reflectionItemForm, category: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500 appearance-none">
                           <option value="goal">目標シート (授業前)</option>
                           <option value="reflection">振り返りシート (授業後)</option>
                         </select>
                         <input type="text" required placeholder="項目名 (例: 今日の目標)" value={reflectionItemForm.title} onChange={e => setReflectionItemForm({ ...reflectionItemForm, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" />
-                        <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg hover:bg-orange-600 transition-all uppercase tracking-[0.2em] text-sm">追加</button>
+                        <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg hover:bg-orange-600 transition-all uppercase tracking-[0.2em] text-sm">{editingReflectionItem ? '更新' : '追加'}</button>
+                        {editingReflectionItem && (
+                          <button type="button" onClick={() => { setEditingReflectionItem(null); setReflectionItemForm({ title: '', type: 'textarea', category: 'goal' }); }} className="w-full bg-slate-200 text-slate-600 font-black py-4 rounded-xl shadow-sm hover:bg-slate-300 transition-all uppercase tracking-[0.2em] text-sm mt-2">キャンセル</button>
+                        )}
                       </form>
                     </div>
                     <div className="md:col-span-2 space-y-4 text-left">
@@ -801,16 +818,19 @@ const App = () => {
                         <div key={category} className="mb-6 border-b border-slate-100 pb-4">
                           <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-4">{category === 'goal' ? '目標シート (授業前)' : '振り返りシート (授業後)'}</h3>
                           <div className="space-y-3">
-                            {reflectionTemplate.filter(i => i.category === category).map((item, idx) => (
-                              <div key={item.id} className="bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-center shadow-sm text-left">
+                            {reflectionTemplate.filter(i => (i.category || 'goal') === category).map((item, idx) => (
+                              <div key={item.id} className="bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-center shadow-sm text-left group">
                                 <div className="flex gap-4 items-center">
                                   <span className="text-xl font-black text-slate-200">{idx + 1}</span>
                                   <h4 className="font-bold text-sm text-slate-800">{item.title}</h4>
                                 </div>
-                                <button onClick={() => deleteReflectionItem(item.id)} className="text-slate-300 hover:text-rose-500 transition-colors p-2"><Trash2 size={16} /></button>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                  <button onClick={() => { setEditingReflectionItem(item.id); setReflectionItemForm({ title: item.title, type: item.type || 'textarea', category: item.category || 'goal' }); window.scrollTo(0,0); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 transition-colors rounded-lg"><Edit2 size={16} /></button>
+                                  <button onClick={() => deleteReflectionItem(item.id)} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 transition-colors rounded-lg"><Trash2 size={16} /></button>
+                                </div>
                               </div>
                             ))}
-                            {reflectionTemplate.filter(i => i.category === category).length === 0 && <p className="text-slate-400 text-xs font-bold py-4 pl-2">項目がまだありません</p>}
+                            {reflectionTemplate.filter(i => (i.category || 'goal') === category).length === 0 && <p className="text-slate-400 text-xs font-bold py-4 pl-2">項目がまだありません</p>}
                           </div>
                         </div>
                       ))}
