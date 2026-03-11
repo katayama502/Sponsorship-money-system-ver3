@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, appId } from '../firebase.js';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { Swords, Heart, Zap, Trophy, RotateCcw, ChevronRight, Shield, X } from 'lucide-react';
+import { GACHA_ITEMS } from '../data/items.js';
 
 // --- 100+ Japanese word list (hiragana + romaji) ---
 const WORD_LIST = [
@@ -117,14 +118,32 @@ const getLevelCharacter = (percentage) => {
 
 const ENEMY_ATTACK_INTERVAL_MS = 3500; // Enemy attacks every 3.5 seconds
 
-const TypingGame = ({ studentId, completedCount, totalMaterials, customStats = { hp: 0, atk: 0, def: 0 } }) => {
+const TypingGame = ({ studentId, completedCount, totalMaterials, customStats = { hp: 0, atk: 0, def: 0 }, equipped = { weapon: null, armor: null, accessory: null } }) => {
   const progressPercentage = totalMaterials > 0 ? Math.min(100, Math.floor((completedCount / totalMaterials) * 100)) : 0;
   const playerLevel = getPlayerLevel(progressPercentage);
   const charInfo = getLevelCharacter(progressPercentage);
   const base = PLAYER_STATS[playerLevel];
-  const maxHp = base.maxHp + (customStats.hp || 0);
-  const playerAtk = base.atk + (customStats.atk || 0);
-  const playerDef = customStats.def || 0;
+
+  const totalCustomStats = React.useMemo(() => {
+    let hp = customStats.hp || 0;
+    let atk = customStats.atk || 0;
+    let def = customStats.def || 0;
+    ['weapon', 'armor', 'accessory'].forEach(type => {
+      if (equipped[type]) {
+        const item = GACHA_ITEMS.find(i => i.id === equipped[type]);
+        if (item) {
+          hp += item.stats.hp || 0;
+          atk += item.stats.atk || 0;
+          def += item.stats.def || 0;
+        }
+      }
+    });
+    return { hp, atk, def };
+  }, [customStats, equipped]);
+
+  const maxHp = base.maxHp + totalCustomStats.hp;
+  const playerAtk = base.atk + totalCustomStats.atk;
+  const playerDef = totalCustomStats.def;
 
   // --- Game Screens: 'select' | 'battle' | 'win' | 'lose' ---
   const [screen, setScreen] = useState('select');
@@ -288,8 +307,8 @@ const TypingGame = ({ studentId, completedCount, totalMaterials, customStats = {
               Lv.{playerLevel} カリキュラム{progressPercentage}%
             </p>
             <div className="flex gap-4 mt-2 text-xs font-black">
-              <span className="text-rose-300">❤️ HP:{maxHp}{customStats.hp > 0 ? ` (+${customStats.hp})` : ''}</span>
-              <span className="text-amber-300">⚡ ATK:{playerAtk}{customStats.atk > 0 ? ` (+${customStats.atk})` : ''}</span>
+              <span className="text-rose-300">❤️ HP:{maxHp}{totalCustomStats.hp > 0 ? ` (+${totalCustomStats.hp})` : ''}</span>
+              <span className="text-amber-300">⚡ ATK:{playerAtk}{totalCustomStats.atk > 0 ? ` (+${totalCustomStats.atk})` : ''}</span>
               <span className="text-sky-300">🛡️ DEF:{playerDef}</span>
             </div>
           </div>

@@ -60,6 +60,8 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot, query, serverTimestamp, addDoc, updateDoc, getDocs, getDoc, where, limit } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll } from 'firebase/storage';
 import TypingGame from './components/TypingGame.jsx';
+import GachaSystem from './components/GachaSystem.jsx';
+import { GACHA_ITEMS } from './data/items.js';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -136,7 +138,8 @@ const App = () => {
   const [activeStudentDetail, setActiveStudentDetail] = useState(null);
   const [studentForm, setStudentForm] = useState({
     name: '', school: '', age: '', remarks: '', nextClassDate: '',
-    studentLoginId: '', studentPassword: '', parentLoginId: '', parentPassword: ''
+    studentLoginId: '', studentPassword: '', parentLoginId: '', parentPassword: '',
+    inventory: [], equipped: { weapon: null, armor: null, accessory: null }
   });
   const [generatedCreds, setGeneratedCreds] = useState(null);
 
@@ -374,6 +377,7 @@ const App = () => {
 
   const saveStudent = async (e) => {
     e.preventDefault();
+    if (!window.confirm(editingStudent ? 'この生徒情報を更新しますか？' : 'この内容で生徒を登録しますか？')) return;
     try {
       const sId = studentForm.studentLoginId || generateCredentials().id;
       const sPw = studentForm.studentPassword || generateCredentials().pw;
@@ -388,7 +392,7 @@ const App = () => {
         setGeneratedCreds({ student: { id: sId, pw: sPw }, parent: { id: pId, pw: pPw }, name: studentForm.name });
         setSaveMessage('登録完了');
       }
-      setStudentForm({ name: '', school: '', age: '', remarks: '', nextClassDate: '', studentLoginId: '', studentPassword: '', parentLoginId: '', parentPassword: '' });
+      setStudentForm({ name: '', school: '', age: '', remarks: '', nextClassDate: '', studentLoginId: '', studentPassword: '', parentLoginId: '', parentPassword: '', inventory: [], equipped: { weapon: null, armor: null, accessory: null } });
       setEditingStudent(null);
     } catch (e) { console.error(e); setSaveMessage(`保存エラー: ${e.message}`); }
     setTimeout(() => setSaveMessage(''), 5000);
@@ -443,6 +447,7 @@ const App = () => {
 
   const saveMaterial = async (e) => {
     e.preventDefault();
+    if (!window.confirm(editingMaterial ? 'このカリキュラム内容を更新しますか？' : 'この内容でカリキュラムを登録しますか？')) return;
     try {
       const data = { ...materialForm, updatedAt: serverTimestamp() };
       if (editingMaterial) {
@@ -450,7 +455,7 @@ const App = () => {
       } else {
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'materials'), { ...data, createdAt: serverTimestamp() });
       }
-      setMaterialForm({ title: '', url: '', category: 'scratch', thumbnailUrl: '', isPublished: true });
+      setMaterialForm({ title: '', url: '', category: 'scratch', thumbnailUrl: '', downloadUrl: '', isPublished: true });
       setEditingMaterial(null);
       setSaveMessage('教材保存完了');
     } catch (e) { setSaveMessage('エラー'); }
@@ -459,6 +464,7 @@ const App = () => {
 
   const submitLearningRecord = async (e) => {
     e.preventDefault();
+    if (!window.confirm('この内容で学習記録を提出しますか？')) return;
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'learning_records'), {
         ...newLearningRecord, studentId: currentUser.studentId, studentName: currentUser.name, date: new Date().toISOString(), createdAt: serverTimestamp(), comment: ''
@@ -515,6 +521,7 @@ const App = () => {
 
   const saveReflectionItem = async (e) => {
     e.preventDefault();
+    if (!window.confirm(editingReflectionItem ? 'この振り返り項目を更新しますか？' : 'この振り返り項目を追加しますか？')) return;
     try {
       const dataToSave = { ...reflectionItemForm, category: reflectionItemForm.category || 'goal' };
       if (editingReflectionItem) {
@@ -548,6 +555,7 @@ const App = () => {
   };
 
   const submitAdminComment = async (recordId) => {
+    if (!window.confirm('このコメントを送信しますか？（★初めてのコメントの場合、生徒に1ポイント付与されます）')) return;
     const record = learningRecords.find(r => r.id === recordId);
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'learning_records', recordId), {
@@ -581,6 +589,7 @@ const App = () => {
 
   const postAnnouncement = async (e) => {
     e.preventDefault();
+    if (!window.confirm('このお知らせを公開・配信しますか？')) return;
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'announcements'), {
         ...announcementForm,
@@ -1125,6 +1134,7 @@ const App = () => {
                         <input type="text" placeholder="タイトル" value={materialForm.title} onChange={e => setMaterialForm({ ...materialForm, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" />
                         <input type="url" placeholder="URL" value={materialForm.url} onChange={e => setMaterialForm({ ...materialForm, url: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" />
                         <input type="url" placeholder="サムネイル画像URL (任意)" value={materialForm.thumbnailUrl || ''} onChange={e => setMaterialForm({ ...materialForm, thumbnailUrl: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" />
+                        <input type="url" placeholder="ダウンロード素材ファイルのURL (任意)" value={materialForm.downloadUrl || ''} onChange={e => setMaterialForm({ ...materialForm, downloadUrl: e.target.value })} className="w-full bg-slate-50 border border-amber-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-amber-400" />
                         <select value={materialForm.category} onChange={e => setMaterialForm({ ...materialForm, category: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500 appearance-none">
                           {MATERIAL_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                         </select>
@@ -1134,7 +1144,7 @@ const App = () => {
                         </div>
                         <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg hover:bg-orange-600 transition-all uppercase tracking-widest text-sm">{editingMaterial ? 'UPDATE' : 'SAVE'}</button>
                         {editingMaterial && (
-                           <button type="button" onClick={() => { setEditingMaterial(null); setMaterialForm({ title: '', url: '', category: 'scratch', thumbnailUrl: '', isPublished: true }); }} className="w-full bg-slate-200 text-slate-600 font-black py-3 rounded-xl shadow-sm hover:bg-slate-300 transition-all uppercase tracking-widest text-xs mt-2">CANCEL</button>
+                           <button type="button" onClick={() => { setEditingMaterial(null); setMaterialForm({ title: '', url: '', category: 'scratch', thumbnailUrl: '', downloadUrl: '', isPublished: true }); }} className="w-full bg-slate-200 text-slate-600 font-black py-3 rounded-xl shadow-sm hover:bg-slate-300 transition-all uppercase tracking-widest text-xs mt-2">CANCEL</button>
                         )}
                       </form>
                     </div>
@@ -1146,10 +1156,10 @@ const App = () => {
                                {m.isPublished === false && <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center"><span className="text-[9px] font-black text-white bg-slate-900 px-2 py-0.5 rounded-full uppercase tracking-widest">非公開</span></div>}
                                <img src={m.thumbnailUrl || getMaterialThumbnail(m.category)} alt="" className="w-full h-full object-cover" />
                             </div>
-                            <div className="text-left"><h4 className="font-black text-slate-800 text-lg text-left">{m.title}</h4><div className="flex flex-wrap gap-2 mt-2 text-left"><span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter text-left">{MATERIAL_CATEGORIES.find(c => c.id === m.category)?.label || m.category || (m.tags && m.tags[0])}</span></div><a href={m.url} target="_blank" className="text-orange-600 text-xs font-black flex items-center gap-1 mt-4 hover:underline text-left uppercase">Open <LinkIcon size={12} /></a></div>
+                            <div className="text-left"><h4 className="font-black text-slate-800 text-lg text-left">{m.title}</h4><div className="flex flex-wrap gap-2 mt-2 text-left"><span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter text-left">{MATERIAL_CATEGORIES.find(c => c.id === m.category)?.label || m.category || (m.tags && m.tags[0])}</span>{m.downloadUrl && <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center gap-1"><Download size={9} /> DLあり</span>}</div><a href={m.url} target="_blank" className="text-orange-600 text-xs font-black flex items-center gap-1 mt-4 hover:underline text-left uppercase">Open <LinkIcon size={12} /></a></div>
                           </div>
                           <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all text-left">
-                            <button onClick={() => { setEditingMaterial(m); setMaterialForm({ ...m, category: m.category || 'scratch', isPublished: m.isPublished !== false }); window.scrollTo(0,0); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 transition-colors"><Edit2 size={14} /></button>
+                            <button onClick={() => { setEditingMaterial(m); setMaterialForm({ ...m, category: m.category || 'scratch', thumbnailUrl: m.thumbnailUrl || '', downloadUrl: m.downloadUrl || '', isPublished: m.isPublished !== false }); window.scrollTo(0,0); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 transition-colors"><Edit2 size={14} /></button>
                             <button onClick={() => deleteMaterial(m.id)} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={14} /></button>
                           </div>
                         </div>
@@ -1165,7 +1175,7 @@ const App = () => {
                   <header className="text-left font-black text-2xl text-left text-slate-800">全体連絡管理</header>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
                     <div className="md:col-span-1 bg-white p-6 rounded-3xl border border-slate-200 h-fit shadow-sm text-left"><h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 text-left">新規投稿</h3><form onSubmit={postAnnouncement} className="space-y-4 text-left"><input type="text" required placeholder="タイトル" value={announcementForm.title} onChange={e => setAnnouncementForm({ ...announcementForm, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" /><textarea required placeholder="本文" value={announcementForm.content} onChange={e => setAnnouncementForm({ ...announcementForm, content: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm h-32 resize-none text-left focus:ring-2 focus:ring-orange-500 outline-none" /><select value={announcementForm.type} onChange={e => setAnnouncementForm({ ...announcementForm, type: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none appearance-none text-left"><option value="info">通常のお知らせ</option><option value="emergency">緊急・重要連絡</option></select><button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg hover:bg-orange-600 transition-all uppercase tracking-[0.2em] text-sm">POST</button></form></div>
-                    <div className="md:col-span-2 space-y-4 text-left">{announcements.map(notice => (<div key={notice.id} className="bg-white p-6 rounded-[2rem] border border-slate-200 flex justify-between items-start group shadow-sm text-left transition-all hover:border-orange-200"><div><div className="flex items-center gap-3 mb-2 text-left"><span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest text-left ${notice.type === 'emergency' ? 'bg-rose-100 text-rose-600' : 'bg-orange-100 text-orange-600'}`}>{notice.type}</span><span className="text-[10px] font-bold text-slate-400 text-left">{notice.createdAt?.toDate().toLocaleDateString()}</span></div><h4 className="font-black text-lg text-left text-slate-800">{notice.title}</h4><p className="text-sm text-slate-500 mt-2 leading-relaxed text-left">{notice.content}</p></div><button onClick={async () => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'announcements', notice.id))} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all shrink-0 text-left"><Trash2 size={18} /></button></div>))}</div>
+                    <div className="md:col-span-2 space-y-4 text-left">{announcements.map(notice => (<div key={notice.id} className="bg-white p-6 rounded-[2rem] border border-slate-200 flex justify-between items-start group shadow-sm text-left transition-all hover:border-orange-200"><div><div className="flex items-center gap-3 mb-2 text-left"><span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest text-left ${notice.type === 'emergency' ? 'bg-rose-100 text-rose-600' : 'bg-orange-100 text-orange-600'}`}>{notice.type}</span><span className="text-[10px] font-bold text-slate-400 text-left">{notice.createdAt?.toDate().toLocaleDateString()}</span></div><h4 className="font-black text-lg text-left text-slate-800">{notice.title}</h4><p className="text-sm text-slate-500 mt-2 leading-relaxed text-left">{notice.content}</p></div><button onClick={async () => { if(window.confirm('このお知らせを削除しますか？')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'announcements', notice.id)); }} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all shrink-0 text-left"><Trash2 size={18} /></button></div>))}</div>
                   </div>
                 </div>
               )}
@@ -1466,6 +1476,8 @@ const App = () => {
                   const studentData = students.find(s => s.id === currentUser.studentId);
                   const points = studentData?.points || 0;
                   const customStats = studentData?.customStats || { hp: 0, atk: 0, def: 0 };
+                  const inventory = studentData?.inventory || [];
+                  const equipped = studentData?.equipped || { weapon: null, armor: null, accessory: null };
 
                   const spendPoint = async (stat) => {
                     if (points <= 0) return;
@@ -1479,9 +1491,10 @@ const App = () => {
                   };
 
                   return (
-                    <div className="bg-white rounded-[2rem] border border-slate-200 shadow-lg p-6 md:p-8">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                        <div>
+                    <>
+                      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-lg p-6 md:p-8">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                          <div>
                           <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">⭐ キャラクター強化</h3>
                           <p className="text-xs text-slate-400 font-medium mt-0.5">先生からコメントをもらったときにポイントがもらえるよ！</p>
                         </div>
@@ -1526,6 +1539,98 @@ const App = () => {
                         </p>
                       )}
                     </div>
+
+                    {/* ★ Gacha System & Equipment Setup ★ */}
+                    <div className="mt-8 space-y-8">
+                      <GachaSystem 
+                        points={points}
+                        onRoll={async (pulledItem) => {
+                          const studentRef = doc(db, 'artifacts', appId, 'public', 'data', 'students', currentUser.studentId);
+                          await updateDoc(studentRef, {
+                            points: points - 10,
+                            inventory: [...inventory, pulledItem.id]
+                          });
+                        }}
+                      />
+
+                      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-lg p-6 md:p-8">
+                        <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6">🛡️ 現在の装備と持ち物</h3>
+                        
+                        {/* Equipment Slots */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                          {['weapon', 'armor', 'accessory'].map(type => {
+                            const eqId = equipped[type];
+                            const eqItem = GACHA_ITEMS.find(i => i.id === eqId);
+                            return (
+                              <div key={type} className="bg-slate-50 rounded-2xl p-4 border border-slate-200 relative overflow-hidden group">
+                                <div className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">{type === 'weapon' ? '⚔️ 武器' : type === 'armor' ? '🛡️ 防具' : '💍 装飾品'}</div>
+                                {eqItem ? (
+                                  <div className="space-y-2">
+                                    <h4 className={`font-black text-lg ${eqItem.rarity === 'SS' ? 'text-fuchsia-600' : eqItem.rarity === 'S' ? 'text-rose-600' : 'text-slate-800'}`}>
+                                      {eqItem.name} <span className="text-[10px] bg-white px-2 py-0.5 rounded-full border shadow-sm">{eqItem.rarity}</span>
+                                    </h4>
+                                    <div className="flex gap-2 text-xs font-bold text-slate-500">
+                                      {eqItem.stats.hp !== 0 && <span>HP {eqItem.stats.hp > 0 ? '+' : ''}{eqItem.stats.hp}</span>}
+                                      {eqItem.stats.atk !== 0 && <span>ATK {eqItem.stats.atk > 0 ? '+' : ''}{eqItem.stats.atk}</span>}
+                                      {eqItem.stats.def !== 0 && <span>DEF {eqItem.stats.def > 0 ? '+' : ''}{eqItem.stats.def}</span>}
+                                    </div>
+                                    <button 
+                                      onClick={async () => {
+                                        const newEquipped = { ...equipped, [type]: null };
+                                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', currentUser.studentId), { equipped: newEquipped });
+                                      }}
+                                      className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 p-2 bg-rose-100 text-rose-500 rounded-lg hover:bg-rose-500 hover:text-white transition-all"
+                                    >外す</button>
+                                  </div>
+                                ) : (
+                                  <div className="text-slate-400 font-medium text-sm py-4 text-center border-2 border-dashed border-slate-200 rounded-xl">未装備</div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Inventory List */}
+                        <div className="border-t border-slate-100 pt-6">
+                          <h4 className="text-sm font-black text-slate-600 mb-4">持ち物（インベントリ）</h4>
+                          {inventory.length === 0 ? (
+                            <p className="text-sm text-slate-400 text-center py-8">ガチャを回して装備を手に入れよう！</p>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-2">
+                              {inventory.map((itemId, idx) => {
+                                const item = GACHA_ITEMS.find(i => i.id === itemId);
+                                if (!item) return null;
+                                const isEquipped = Object.values(equipped).includes(itemId);
+                                return (
+                                  <div key={`${itemId}-${idx}`} className={`p-4 rounded-xl border flex items-center justify-between gap-4 ${isEquipped ? 'bg-slate-100 border-slate-200 opacity-60' : 'bg-white border-slate-200 shadow-sm hover:border-orange-200'}`}>
+                                    <div>
+                                      <p className="font-black text-sm text-slate-800">{item.name} <span className="text-[9px] px-1.5 rounded bg-slate-100 border text-slate-500">{item.rarity}</span></p>
+                                      <div className="flex gap-2 text-[10px] font-bold text-slate-400 mt-1">
+                                        <span>{item.type === 'weapon' ? '⚔️' : item.type === 'armor' ? '🛡️' : '💍'}</span>
+                                        {item.stats.hp !== 0 && <span>HP{item.stats.hp>0?'+':''}{item.stats.hp}</span>}
+                                        {item.stats.atk !== 0 && <span>ATK{item.stats.atk>0?'+':''}{item.stats.atk}</span>}
+                                        {item.stats.def !== 0 && <span>DEF{item.stats.def>0?'+':''}{item.stats.def}</span>}
+                                      </div>
+                                    </div>
+                                    {!isEquipped && (
+                                      <button 
+                                        onClick={async () => {
+                                          const newEquipped = { ...equipped, [item.type]: itemId };
+                                          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', currentUser.studentId), { equipped: newEquipped });
+                                        }}
+                                        className="shrink-0 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-lg hover:bg-orange-500 transition-colors"
+                                      >装備する</button>
+                                    )}
+                                    {isEquipped && <span className="text-[10px] font-black text-emerald-600 bg-emerald-100 px-2 py-1 rounded-md shrink-0">装備中</span>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
                   );
                 })()}
 
@@ -1724,6 +1829,7 @@ const App = () => {
                     completedCount={completedCount}
                     totalMaterials={materials.length || 1}
                     customStats={studentData?.customStats || { hp: 0, atk: 0, def: 0 }}
+                    equipped={studentData?.equipped || { weapon: null, armor: null, accessory: null }}
                   />
                 </div>
               );
@@ -2002,6 +2108,18 @@ const App = () => {
                                           {buttonState.icon}
                                           {buttonState.text}
                                         </button>
+                                        {m.downloadUrl && (
+                                          <a
+                                            href={m.downloadUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="mt-2 w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest transition-all bg-amber-100 text-amber-700 hover:bg-amber-500 hover:text-white border border-amber-200 hover:border-transparent hover:shadow-lg"
+                                            onClick={e => e.stopPropagation()}
+                                          >
+                                            <Download size={16} />
+                                            ダウンロード素材
+                                          </a>
+                                        )}
                                       </>
                                     );
                                   })()}
