@@ -140,12 +140,13 @@ const App = () => {
   const [generatedCreds, setGeneratedCreds] = useState(null);
 
   // --- 学習記録 & お知らせフォーム ---
-  const [newLearningRecord, setNewLearningRecord] = useState({ title: '', content: {}, imageUrl: '', fileUrl: '', linkUrl: '' });
+  const [newLearningRecord, setNewLearningRecord] = useState({ title: '', content: {}, imageUrl: '', fileUrl: '', linkUrl: '', lessonDate: new Date().toISOString().slice(0, 10) });
   const [adminComment, setAdminComment] = useState({});
   const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', type: 'info' });
   const [reflectionTemplate, setReflectionTemplate] = useState([]);
   const [reflectionItemForm, setReflectionItemForm] = useState({ title: '', type: 'textarea', category: 'goal' });
   const [editingReflectionItem, setEditingReflectionItem] = useState(null);
+  const [parentComment, setParentComment] = useState({});
 
   // --- .sb3 アップロード ---
   const [sb3Files, setSb3Files] = useState([]);
@@ -164,6 +165,12 @@ const App = () => {
   // --- メッセージ機能状態 ---
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  // --- 管理者・生徒検索 & 通知 ---
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  // Record which announcements have been read (by ID) in localStorage
+  const [readAnnouncementIds, setReadAnnouncementIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('readAnnouncements') || '[]'); } catch { return []; }
+  });
 
   // --- YouTube モーダル ---
   const [youtubeModal, setYoutubeModal] = useState(null); // { title, embedUrl }
@@ -536,10 +543,24 @@ const App = () => {
   };
 
   const submitAdminComment = async (recordId) => {
+    const record = learningRecords.find(r => r.id === recordId);
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'learning_records', recordId), {
         comment: adminComment[recordId], commentedAt: serverTimestamp()
       });
+      // 生徒にコメント通知メッセージを自動送信
+      if (record?.studentId) {
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), {
+          text: `📝 「${record.title}」に先生からコメントが届きました。マイページで確認してね！`,
+          senderId: 'admin',
+          senderRole: 'admin',
+          senderName: '講師・サポーター (自動通知)',
+          receiverId: record.studentId,
+          studentId: record.studentId,
+          isRead: false,
+          createdAt: serverTimestamp(),
+        });
+      }
       setSaveMessage('送信しました');
     } catch (e) { setSaveMessage('失敗'); }
   };
@@ -889,8 +910,20 @@ const App = () => {
                         <button type="submit" className="w-full bg-orange-600 text-white font-black py-4 rounded-xl shadow-lg hover:bg-orange-700 transition-all flex items-center justify-center gap-2 active:scale-95 text-sm uppercase tracking-widest">{editingStudent ? 'UPDATE' : 'ID発行と登録'}</button>
                       </form>
                     </div>
-                    <div className="xl:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                      {students.map(s => {
+                    <div className="xl:col-span-3 space-y-4 text-left">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="生徒名、学校名で絞り込み..."
+                          value={studentSearchQuery}
+                          onChange={e => setStudentSearchQuery(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-5 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-orange-400 shadow-sm"
+                        />
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"><Users size={16} /></span>
+                        {studentSearchQuery && <button onClick={() => setStudentSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"><X size={14} /></button>}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {students.filter(s => !studentSearchQuery || s.name?.includes(studentSearchQuery) || s.school?.includes(studentSearchQuery)).map(s => {
                         const studentMsgs = messages.filter(m => m.studentId === s.id);
                         const hasUnread = studentMsgs.length > 0 && studentMsgs[studentMsgs.length - 1].senderId !== 'admin';
 
@@ -914,6 +947,7 @@ const App = () => {
                           </div>
                         );
                       })}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1244,7 +1278,22 @@ const App = () => {
               </div>
               <div className="hidden md:flex items-center gap-3">
                 <div className="flex gap-2 bg-slate-100/50 p-1.5 rounded-2xl">
-                  <button onClick={() => setActiveTab('mypage')} className={`px-4 py-2 rounded-xl text-sm font-black transition-all ${activeTab === 'mypage' ? 'bg-orange-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}>マイページ</button>
+                  <button
+                    onClick={() => {
+                      setActiveTab('mypage');
+                      const allIds = announcements.map(a => a.id);
+                      setReadAnnouncementIds(allIds);
+                      localStorage.setItem('readAnnouncements', JSON.stringify(allIds));
+                    }}
+                    className={`relative px-4 py-2 rounded-xl text-sm font-black transition-all ${activeTab === 'mypage' ? 'bg-orange-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}
+                  >
+                    マイページ
+                    {announcements.filter(a => !readAnnouncementIds.includes(a.id)).length > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+                        {announcements.filter(a => !readAnnouncementIds.includes(a.id)).length}
+                      </span>
+                    )}
+                  </button>
                   <button onClick={() => setActiveTab('materials')} className={`px-4 py-2 rounded-xl text-sm font-black transition-all ${activeTab === 'materials' ? 'bg-sky-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}>きょうざいを見る</button>
                 </div>
                 <button onClick={handleLogout} className="text-slate-400 hover:text-rose-500 transition-colors ml-2 bg-slate-100 p-2.5 rounded-full"><LogOut size={20} /></button>
@@ -1357,7 +1406,33 @@ const App = () => {
                   );
                 })()}
 
-                {/* 学習記録フォーム（生徒のみ・大型・中央） */}
+                {/* 次のおすすめ教材（生徒・保護者共通） */}
+                {(() => {
+                  const studentIdCtx = currentUser.role === 'student' ? currentUser.studentId : currentUser.childId;
+                  const studentData = students.find(s => s.id === studentIdCtx);
+                  const completedIds = studentData?.completedMaterials || [];
+                  const nextMaterial = materials.find(m => m.isPublished !== false && !completedIds.includes(m.id));
+                  if (!nextMaterial) return null;
+                  return (
+                    <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-[2rem] p-6 md:p-8 text-white shadow-xl flex flex-col sm:flex-row items-start sm:items-center gap-6">
+                      <div className="bg-white/20 rounded-2xl p-4 shrink-0">
+                        <Trophy size={32} className="text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-black uppercase tracking-widest opacity-80 mb-1">✨ 次に挑戦しよう！</p>
+                        <h3 className="text-xl font-black leading-tight">{nextMaterial.title}</h3>
+                        <p className="text-sm opacity-80 font-medium mt-1">{nextMaterial.category} カリキュラム</p>
+                      </div>
+                      <button
+                        onClick={() => setActiveTab('materials')}
+                        className="shrink-0 bg-white text-orange-600 font-black text-sm px-6 py-3 rounded-xl shadow-md hover:scale-105 transition-transform active:scale-95"
+                      >
+                        きょうざいを見る→
+                      </button>
+                    </div>
+                  );
+                })()}
+
                 {currentUser.role === 'student' && (
                   <div className="bg-white rounded-[2rem] border border-slate-200 shadow-lg p-8 md:p-12">
                     <div className="flex items-center justify-between mb-8">
@@ -1389,6 +1464,16 @@ const App = () => {
                     </div>
 
                     <form onSubmit={submitLearningRecord} className="space-y-6">
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">授業日 (いつの授業？)</label>
+                        <input
+                          type="date"
+                          value={newLearningRecord.lessonDate || ''}
+                          onChange={e => setNewLearningRecord({ ...newLearningRecord, lessonDate: e.target.value })}
+                          className={`w-full bg-slate-50 border rounded-2xl px-5 py-3 text-sm font-bold outline-none transition-all ${newLearningRecord.recordType === 'goal' ? 'border-emerald-100 focus:ring-emerald-500' : 'border-slate-200 focus:ring-orange-500'}`}
+                          required
+                        />
+                      </div>
                       <div>
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">タイトル ({newLearningRecord.recordType === 'goal' ? '目標のタイトル' : '振り返りのタイトル'})</label>
                         <input type="text" value={newLearningRecord.title} onChange={e => setNewLearningRecord({ ...newLearningRecord, title: e.target.value })} className={`w-full bg-slate-50 border rounded-2xl px-5 py-4 text-base font-bold outline-none transition-all ${newLearningRecord.recordType === 'goal' ? 'border-emerald-100 focus:ring-emerald-500' : 'border-slate-200 focus:ring-orange-500'}`} placeholder={newLearningRecord.recordType === 'goal' ? "例: 今日はScratchでゲームを完成させる！" : "例: Scratchでアニメーションを作った！"} required />
@@ -1544,6 +1629,33 @@ const App = () => {
                             )}
 
                             {record.comment && <div className={`mt-4 border p-5 rounded-2xl ${record.recordType === 'goal' ? 'bg-emerald-50/70 border-emerald-100' : 'bg-orange-50/70 border-orange-100'}`}><div className={`flex items-center gap-2 font-black text-[10px] uppercase tracking-widest mb-2 ${record.recordType === 'goal' ? 'text-emerald-600' : 'text-orange-600'}`}><MessageSquare size={12} /> 講師コメント</div><p className="text-sm text-slate-700 font-bold italic leading-relaxed">"{record.comment}"</p></div>}
+
+                            {/* 保護者コメントセクション */}
+                            {currentUser.role === 'parent' && (
+                              <div className="mt-4 bg-sky-50 border border-sky-100 rounded-2xl p-4">
+                                <div className="flex items-center gap-2 font-black text-[10px] uppercase tracking-widest mb-2 text-sky-600"><MessageSquare size={12} /> 保護者コメント</div>
+                                {record.parentComment && <p className="text-sm text-slate-700 font-bold italic mb-3">"{record.parentComment}"</p>}
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    placeholder="応援メッセージを送ろう！"
+                                    value={parentComment[record.id] || ''}
+                                    onChange={e => setParentComment({ ...parentComment, [record.id]: e.target.value })}
+                                    className="flex-1 bg-white border border-sky-200 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-sky-400"
+                                  />
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'learning_records', record.id), { parentComment: parentComment[record.id] || '' });
+                                        setSaveMessage('保護者コメントを送信しました');
+                                        setTimeout(() => setSaveMessage(''), 3000);
+                                      } catch(e) { setSaveMessage('送信失敗'); }
+                                    }}
+                                    className="bg-sky-500 text-white font-bold px-4 py-2 rounded-xl text-xs hover:bg-sky-600 transition-colors"
+                                  >送信</button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))
