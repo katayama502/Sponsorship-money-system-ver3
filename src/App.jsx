@@ -132,6 +132,7 @@ const App = () => {
 
   // --- Student Form State ---
   const [editingStudent, setEditingStudent] = useState(null);
+  const [activeStudentDetail, setActiveStudentDetail] = useState(null);
   const [studentForm, setStudentForm] = useState({
     name: '', school: '', age: '', courseId: 'premium', remarks: '', nextClassDate: '',
     studentLoginId: '', studentPassword: '', parentLoginId: '', parentPassword: ''
@@ -153,12 +154,16 @@ const App = () => {
 
   // --- 教材データ状態 ---
   const [materials, setMaterials] = useState([]);
-  const [materialForm, setMaterialForm] = useState({ title: '', url: '', category: 'scratch', thumbnailUrl: '' });
+  const [materialForm, setMaterialForm] = useState({ title: '', url: '', category: 'scratch', thumbnailUrl: '', isPublished: true });
   const [editingMaterial, setEditingMaterial] = useState(null);
   const [activeWorkspace, setActiveWorkspace] = useState(null);
   const [splitRatio, setSplitRatio] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
   const [completionRequests, setCompletionRequests] = useState([]);
+
+  // --- メッセージ機能状態 ---
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
 
   // --- YouTube モーダル ---
   const [youtubeModal, setYoutubeModal] = useState(null); // { title, embedUrl }
@@ -241,6 +246,9 @@ const App = () => {
     const unsubCompletionRequests = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'completion_requests'), (snap) => {
       setCompletionRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)));
     });
+    const unsubMessages = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), (snap) => {
+      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)));
+    });
 
     // .sb3ファイルのリスナー (ログインした生徒のファイルのみ)
     if (currentUser.role === 'student' && currentUser.studentId) {
@@ -252,14 +260,14 @@ const App = () => {
       );
       return () => {
         unsubStudents(); unsubAnnounce();
-        unsubLearning(); unsubMaterials(); unsubReflections(); unsubCompletionRequests();
+        unsubLearning(); unsubMaterials(); unsubReflections(); unsubCompletionRequests(); unsubMessages();
         unsubSb3();
       };
     }
 
     return () => {
       unsubStudents(); unsubAnnounce();
-      unsubLearning(); unsubMaterials(); unsubReflections(); unsubCompletionRequests();
+      unsubLearning(); unsubMaterials(); unsubReflections(); unsubCompletionRequests(); unsubMessages();
     };
   }, [currentUser]);
 
@@ -319,14 +327,29 @@ const App = () => {
     }
     const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'students'));
     let found = null;
+    let parentChildren = [];
+    
     querySnapshot.forEach((docSnap) => {
       const data = docSnap.data();
       if (data.studentLoginId === loginId && data.studentPassword === password) {
         found = { role: 'student', name: data.name, studentId: docSnap.id, nextClassDate: data.nextClassDate };
       } else if (data.parentLoginId === loginId && data.parentPassword === password) {
-        found = { role: 'parent', name: `${data.name}の保護者`, childId: docSnap.id, childName: data.name, nextClassDate: data.nextClassDate };
+        parentChildren.push({ id: docSnap.id, ...data });
       }
     });
+
+    if (parentChildren.length > 0) {
+      const firstChild = parentChildren[0];
+      found = { 
+        role: 'parent', 
+        name: `${firstChild.name}の保護者`, 
+        childId: firstChild.id, 
+        childName: firstChild.name, 
+        nextClassDate: firstChild.nextClassDate,
+        allChildren: parentChildren
+      };
+    }
+
     if (found) { setCurrentUser(found); setActiveTab('mypage'); }
     else { setAuthError('IDまたはパスワードが正しくありません'); }
   };
@@ -371,6 +394,36 @@ const App = () => {
     } catch (e) { setSaveMessage('失敗'); }
   };
 
+  const deleteStudentCascade = async (studentId) => {
+    if (!window.confirm('この生徒と、紐づくすべてのデータ（提出シート、ファイル、承認リクエスト）を削除しますか？\nこの操作は取り消せません。')) return;
+    try {
+      // 1. Delete associated learning records
+      const recordsToDelete = learningRecords.filter(r => r.studentId === studentId);
+      for (const r of recordsToDelete) {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'learning_records', r.id));
+      }
+      
+      // 2. Delete associated sb3 files (from db, storage cleanup assumes same or separate process)
+      const filesToDelete = sb3Files.filter(f => f.studentId === studentId);
+      for (const f of filesToDelete) {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sb3_files', f.id));
+      }
+      
+      // 3. Delete associated completion requests
+      const requestsToDelete = completionRequests.filter(req => req.studentId === studentId);
+      for (const req of requestsToDelete) {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'completion_requests', req.id));
+      }
+
+      // 4. Finally delete the student record itself
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', studentId));
+      setSaveMessage('生徒データを一括削除しました');
+    } catch (e) {
+      console.error("Delete cascade failed: ", e);
+      setSaveMessage('削除中にエラーが発生しました');
+    }
+  };
+
   const saveMaterial = async (e) => {
     e.preventDefault();
     try {
@@ -380,7 +433,7 @@ const App = () => {
       } else {
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'materials'), { ...data, createdAt: serverTimestamp() });
       }
-      setMaterialForm({ title: '', url: '', category: 'scratch', thumbnailUrl: '' });
+      setMaterialForm({ title: '', url: '', category: 'scratch', thumbnailUrl: '', isPublished: true });
       setEditingMaterial(null);
       setSaveMessage('教材保存完了');
     } catch (e) { setSaveMessage('エラー'); }
@@ -395,6 +448,27 @@ const App = () => {
       setNewLearningRecord({ title: '', content: {}, imageUrl: '', fileUrl: '', linkUrl: '' });
       setSaveMessage('記録しました');
     } catch (e) { setSaveMessage('失敗'); }
+  };
+
+  const sendMessage = async (e, receiverId, studentIdCtx) => {
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), {
+        text: newMessage,
+        senderId: currentUser.role === 'admin' ? 'admin' : currentUser.studentId || currentUser.childId,
+        senderRole: currentUser.role,
+        senderName: currentUser.name || (currentUser.role === 'admin' ? '講師・サポーター' : '生徒/保護者'),
+        receiverId: receiverId, // If admin sending, it's studentId. If student/parent sending, it's 'admin'.
+        studentId: studentIdCtx, // The context student ID for this chat
+        createdAt: serverTimestamp(),
+      });
+      setNewMessage('');
+    } catch (err) {
+      console.error(err);
+      setSaveMessage('メッセージ送信エラー');
+      setTimeout(() => setSaveMessage(''), 3000);
+    }
   };
 
   const saveReflectionItem = async (e) => {
@@ -531,6 +605,22 @@ const App = () => {
     }
   };
 
+  const rejectCompletion = async (requestId) => {
+     if(!window.confirm('この完了報告を差し戻しますか？')) return;
+     try {
+       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'completion_requests', requestId), {
+         status: 'rejected',
+         rejectedAt: serverTimestamp()
+       });
+       setSaveMessage('差し戻ししました');
+       setTimeout(() => setSaveMessage(''), 3000);
+     } catch (err) {
+       console.error(err);
+       setSaveMessage('差し戻しに失敗しました');
+       setTimeout(() => setSaveMessage(''), 3000);
+     }
+  };
+
   // --- ログイン画面 ---
   if (!currentUser || !currentUser.role) {
     return (
@@ -629,12 +719,40 @@ const App = () => {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto py-6 space-y-2 px-4">
-              <button onClick={() => { setActiveTab('students'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'students' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><Users size={18} /> 受講生一覧</button>
-              <button onClick={() => { setActiveTab('records'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'records' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><FileText size={18} /> 提出シート確認</button>
-              <button onClick={() => { setActiveTab('materials'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'materials' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><BookOpen size={18} /> 教材リソース</button>
-              <button onClick={() => { setActiveTab('approvals'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'approvals' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><CheckCircle2 size={18} /> カリキュラム承認</button>
-              <button onClick={() => { setActiveTab('reflections'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'reflections' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><Settings2 size={18} /> 記録フォーマット</button>
-              <button onClick={() => { setActiveTab('notices'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'notices' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}><Megaphone size={18} /> 全体お知らせ</button>
+              <button onClick={() => { setActiveTab('students'); setActiveStudentDetail(null); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'students' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
+                <span className="flex items-center gap-3"><Users size={18} /> 受講生一覧</span>
+                {(() => {
+                  const unreadCount = students.filter(s => {
+                    const studentMsgs = messages.filter(m => m.studentId === s.id);
+                    if (studentMsgs.length === 0) return false;
+                    return studentMsgs[studentMsgs.length - 1].senderId !== 'admin';
+                  }).length;
+                  return unreadCount > 0 ? <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{unreadCount}</span> : null;
+                })()}
+              </button>
+              <button onClick={() => { setActiveTab('records'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'records' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
+                <span className="flex items-center gap-3"><FileText size={18} /> 提出シート確認</span>
+                {(() => {
+                  const unreadCount = learningRecords.filter(r => !r.comment).length;
+                  return unreadCount > 0 ? <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{unreadCount}</span> : null;
+                })()}
+              </button>
+              <button onClick={() => { setActiveTab('materials'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'materials' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
+                <span className="flex items-center gap-3"><BookOpen size={18} /> 教材リソース</span>
+              </button>
+              <button onClick={() => { setActiveTab('approvals'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'approvals' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
+                <span className="flex items-center gap-3"><CheckCircle2 size={18} /> カリキュラム承認</span>
+                {(() => {
+                  const pendingCount = completionRequests.filter(r => r.status === 'pending').length;
+                  return pendingCount > 0 ? <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{pendingCount}</span> : null;
+                })()}
+              </button>
+              <button onClick={() => { setActiveTab('reflections'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'reflections' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
+                <span className="flex items-center gap-3"><Settings2 size={18} /> 記録フォーマット</span>
+              </button>
+              <button onClick={() => { setActiveTab('notices'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'notices' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
+                <span className="flex items-center gap-3"><Megaphone size={18} /> 全体お知らせ</span>
+              </button>
             </div>
             <div className="p-4 border-t border-slate-800">
               <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold hover:bg-slate-800 text-rose-400 rounded-xl transition-all"><LogOut size={18} /> ログアウト</button>
@@ -680,12 +798,20 @@ const App = () => {
                               教材: {material ? material.title : '不明な教材'}
                             </h3>
                           </div>
-                          <button
-                            onClick={() => approveCompletion(req.id, req.studentId, req.materialId)}
-                            className="shrink-0 bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-md"
-                          >
-                            <CheckCircle2 size={18} /> 承認する
-                          </button>
+                          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto mt-4 md:mt-0">
+                            <button
+                              onClick={() => rejectCompletion(req.id)}
+                              className="shrink-0 bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-600 px-6 py-3 rounded-xl font-bold transition-colors text-sm"
+                            >
+                              差し戻し
+                            </button>
+                            <button
+                              onClick={() => approveCompletion(req.id, req.studentId, req.materialId)}
+                              className="shrink-0 bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-md text-sm"
+                            >
+                              <CheckCircle2 size={18} /> 承認する
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -701,7 +827,7 @@ const App = () => {
               )}
 
               {/* 生徒管理 */}
-              {currentUser.role === 'admin' && activeTab === 'students' && (
+              {currentUser.role === 'admin' && activeTab === 'students' && !activeStudentDetail && (
                 <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500 text-left">
                   <header className="text-left"><h2 className="text-2xl font-black tracking-tight text-left">受講生・保護者管理</h2></header>
                   {generatedCreds && (
@@ -734,17 +860,148 @@ const App = () => {
                       </form>
                     </div>
                     <div className="xl:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                      {students.map(s => (
-                        <div key={s.id} className="bg-white p-6 rounded-3xl border border-slate-200 flex flex-col justify-between shadow-sm relative group hover:border-orange-300 transition-all text-left">
-                          <div className="absolute top-0 right-0 p-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-all text-left"><button onClick={() => { setEditingStudent(s); setStudentForm(s); window.scrollTo(0, 0); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 rounded-lg"><Edit2 size={14} /></button><button onClick={async () => { if (window.confirm('削除？')) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', s.id)); } }} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 rounded-lg"><Trash2 size={14} /></button></div>
-                          <div className="text-left"><h4 className="font-black text-xl text-slate-800 text-left">{s.name}</h4><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left">{s.school || '学校未登録'} | {s.age || '?'}歳</p></div>
-                          <div className="mt-6 pt-4 border-t border-slate-50 flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-tighter text-left"><span>生徒ID: {s.studentLoginId}</span><span>保護者ID: {s.parentLoginId}</span></div>
-                        </div>
-                      ))}
+                      {students.map(s => {
+                        const studentMsgs = messages.filter(m => m.studentId === s.id);
+                        const hasUnread = studentMsgs.length > 0 && studentMsgs[studentMsgs.length - 1].senderId !== 'admin';
+
+                        return (
+                          <div key={s.id} className="bg-white p-6 rounded-3xl border border-slate-200 flex flex-col justify-between shadow-sm relative group hover:border-orange-300 transition-all text-left">
+                            <div className="absolute top-0 right-0 p-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-all text-left">
+                              <button onClick={() => { setEditingStudent(s); setStudentForm(s); window.scrollTo(0, 0); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 rounded-lg"><Edit2 size={14} /></button>
+                              <button onClick={() => deleteStudentCascade(s.id)} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 rounded-lg"><Trash2 size={14} /></button>
+                            </div>
+                            <div className="text-left flex items-start justify-between">
+                              <div>
+                                <h4 className="font-black text-xl text-slate-800 text-left">{s.name}</h4>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left mt-1">{s.school || '学校未登録'} | {s.age || '?'}歳</p>
+                              </div>
+                              {hasUnread && <div className="bg-rose-100 text-rose-600 text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-widest flex items-center gap-1 shadow-sm mt-1 animate-pulse"><MessageSquare size={10} /> 新着</div>}
+                            </div>
+                            <div className="mt-4 pt-4 border-t border-slate-50 flex flex-col gap-3">
+                              <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-tighter text-left"><span>生徒ID: {s.studentLoginId}</span><span>保護者ID: {s.parentLoginId}</span></div>
+                              <button onClick={() => setActiveStudentDetail(s.id)} className={`w-full font-bold py-2 rounded-xl text-xs transition-colors ${hasUnread ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-orange-100 hover:text-orange-600'}`}>生徒カルテを見る</button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
               )}
+
+              {/* 生徒個別カルテ (Admin) */}
+              {currentUser.role === 'admin' && activeTab === 'students' && activeStudentDetail && (() => {
+                const s = students.find(s => s.id === activeStudentDetail);
+                if (!s) return null;
+                const completedCount = s.completedMaterials?.length || 0;
+                const totalMaterials = materials.length > 0 ? materials.length : 1;
+                const progressPercentage = Math.min(100, Math.floor((completedCount / totalMaterials) * 100));
+                const studentRecords = learningRecords.filter(r => r.studentId === s.id).sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
+                const studentFiles = sb3Files.filter(f => f.studentId === s.id);
+
+                return (
+                  <div className="space-y-8 animate-in slide-in-from-right-4 duration-500 text-left">
+                    <header className="flex items-center gap-4 border-b border-slate-200 pb-4">
+                      <button onClick={() => setActiveStudentDetail(null)} className="p-2 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-orange-600 hover:bg-orange-50 transition-colors">
+                         <span className="font-bold text-sm px-2">← 戻る</span>
+                      </button>
+                      <div>
+                        <h2 className="text-2xl font-black tracking-tight text-slate-800 text-left">{s.name}様のカルテ</h2>
+                        <p className="text-xs font-bold text-slate-400 mt-1">{s.school || '学校未登録'} | {s.age || '?'}歳</p>
+                      </div>
+                    </header>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                      <div className="lg:col-span-1 space-y-6">
+                        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+                          <h3 className="text-sm font-black text-slate-800 mb-4 border-b border-slate-100 pb-2">学習進捗</h3>
+                          <div className="flex items-center justify-between mb-2">
+                             <span className="text-xs font-bold text-slate-500">完了カリキュラム</span>
+                             <span className="text-sm font-black text-orange-600">{completedCount} / {materials.length}</span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-3 mb-4 overflow-hidden"><div className="bg-orange-500 h-3 rounded-full transition-all duration-1000" style={{ width: `${progressPercentage}%` }}></div></div>
+                        </div>
+
+                        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm overflow-hidden">
+                           <h3 className="text-sm font-black text-slate-800 mb-4 border-b border-slate-100 pb-2 flex items-center gap-2"><FileArchive size={16} className="text-slate-400"/> sb3ファイル ({studentFiles.length})</h3>
+                           <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                             {studentFiles.length === 0 ? <p className="text-xs text-slate-400">ファイルなし</p> : 
+                               studentFiles.map(f => (
+                                 <div key={f.id} className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                    <div className="overflow-hidden">
+                                       <p className="text-xs font-bold text-slate-700 truncate">{f.fileName}</p>
+                                       <p className="text-[9px] text-slate-400">{f.uploadDate}</p>
+                                    </div>
+                                    <a href={f.downloadUrl} download={f.fileName} className="p-2 bg-white shadow-sm border border-slate-200 rounded-lg text-slate-400 hover:text-orange-600"><Download size={14} /></a>
+                                 </div>
+                               ))
+                             }
+                           </div>
+                        </div>
+                      </div>
+
+                      <div className="lg:col-span-2 space-y-6">
+                        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col h-[500px]">
+                           <h3 className="text-sm font-black text-slate-800 mb-4 border-b border-slate-100 pb-2 flex items-center gap-2"><MessageSquare size={16} className="text-orange-500"/> メッセージ</h3>
+                           <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-4">
+                              {messages.filter(m => m.studentId === s.id).map(msg => {
+                                const isAdmin = msg.senderId === 'admin';
+                                return (
+                                  <div key={msg.id} className={`flex ${isAdmin ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[80%] rounded-2xl px-4 py-2 ${isAdmin ? 'bg-orange-500 text-white rounded-tr-sm' : 'bg-slate-100 text-slate-800 rounded-tl-sm'}`}>
+                                      <p className="text-xs font-bold mb-1 opacity-80">{msg.senderName}</p>
+                                      <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                                      <p className="text-[9px] text-right mt-1 opacity-70">{msg.createdAt ? new Date(msg.createdAt.toMillis()).toLocaleString() : '送信中...'}</p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {messages.filter(m => m.studentId === s.id).length === 0 && <p className="text-center text-slate-400 text-xs mt-10">メッセージはまだありません</p>}
+                           </div>
+                           <form onSubmit={(e) => sendMessage(e, s.id, s.id)} className="flex gap-2 shrink-0">
+                              <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="メッセージを入力..." className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-500" />
+                              <button type="submit" className="bg-slate-900 text-white px-4 rounded-xl font-bold text-sm tracking-wider uppercase hover:bg-orange-600 transition-colors">送信</button>
+                           </form>
+                        </div>
+
+                        <h3 className="text-lg font-black text-slate-800 flex items-center gap-2 mt-8"><ImageIcon size={20} className="text-orange-500" /> 提出シートの記録</h3>
+                        <div className="space-y-4">
+                           {studentRecords.length === 0 ? (
+                             <div className="bg-white p-12 text-center rounded-3xl border border-dashed border-slate-200 text-slate-400 font-bold text-sm">記録がありません</div>
+                           ) : (
+                             studentRecords.map(record => (
+                                <div key={record.id} className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col gap-4">
+                                   <div className="flex justify-between items-start">
+                                     <div>
+                                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-black tracking-widest uppercase ${record.recordType === 'goal' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600'}`}>
+                                         {record.recordType === 'goal' ? '目標シート' : '振り返りシート'}
+                                       </span>
+                                       <p className="text-[10px] font-bold text-slate-400 mt-2">{new Date(record.date).toLocaleDateString()}</p>
+                                       <h4 className="text-lg font-black text-slate-800 mt-1">{record.title}</h4>
+                                     </div>
+                                   </div>
+                                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm whitespace-pre-wrap text-slate-600 font-medium">
+                                      {typeof record.content === 'object' ? Object.keys(record.content).map(k => record.content[k] ? <div key={k} className="mb-2"><span className="text-[10px] text-slate-400 uppercase block">{reflectionTemplate.find(t=>t.id===k)?.title || k}</span>{record.content[k]}</div> : null) : record.content}
+                                   </div>
+                                   {record.linkUrl && <a href={record.linkUrl} target="_blank" className="text-xs font-bold text-orange-600 flex items-center gap-1"><LinkIcon size={12}/> 作品リンク</a>}
+                                   <div className="bg-[#FFF5F0] p-4 rounded-xl border border-orange-100">
+                                      <p className="text-[10px] font-black text-orange-600 mb-2 flex items-center gap-1"><MessageSquare size={12}/> 講師コメント</p>
+                                      {record.comment ? <p className="text-sm font-bold text-slate-700 italic">"{record.comment}"</p> : 
+                                        <div className="flex gap-2">
+                                          <input type="text" placeholder="コメントを入力..." value={adminComment[record.id] || ''} onChange={e => setAdminComment({...adminComment, [record.id]: e.target.value})} className="flex-1 text-xs border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-orange-500" />
+                                          <button onClick={() => submitAdminComment(record.id)} className="bg-slate-900 text-white px-3 py-2 rounded-lg text-xs font-bold">送信</button>
+                                        </div>
+                                      }
+                                   </div>
+                                </div>
+                             ))
+                           )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* お知らせ/教材管理 */}
               {currentUser.role === 'admin' && activeTab === 'materials' && (
@@ -760,20 +1017,28 @@ const App = () => {
                         <select value={materialForm.category} onChange={e => setMaterialForm({ ...materialForm, category: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500 appearance-none">
                           {MATERIAL_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                         </select>
-                        <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg hover:bg-orange-600 transition-all uppercase tracking-widest text-sm">SAVE</button>
+                        <div className="flex items-center gap-2 px-2 pb-2">
+                          <input type="checkbox" id="isPublished" checked={materialForm.isPublished} onChange={e => setMaterialForm({ ...materialForm, isPublished: e.target.checked })} className="w-4 h-4 text-orange-600 rounded bg-slate-100 border-slate-300 focus:ring-orange-500" />
+                          <label htmlFor="isPublished" className="text-xs font-bold text-slate-600">生徒に公開する</label>
+                        </div>
+                        <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg hover:bg-orange-600 transition-all uppercase tracking-widest text-sm">{editingMaterial ? 'UPDATE' : 'SAVE'}</button>
+                        {editingMaterial && (
+                           <button type="button" onClick={() => { setEditingMaterial(null); setMaterialForm({ title: '', url: '', category: 'scratch', thumbnailUrl: '', isPublished: true }); }} className="w-full bg-slate-200 text-slate-600 font-black py-3 rounded-xl shadow-sm hover:bg-slate-300 transition-all uppercase tracking-widest text-xs mt-2">CANCEL</button>
+                        )}
                       </form>
                     </div>
                     <div className="md:col-span-2 space-y-4 text-left">
                       {materials.map(m => (
-                        <div key={m.id} className="bg-white p-6 rounded-3xl border border-slate-200 flex justify-between items-start group shadow-sm text-left hover:border-orange-200 transition-all">
+                        <div key={m.id} className={`bg-white p-6 rounded-3xl border ${m.isPublished === false ? 'border-dashed border-slate-300 opacity-60' : 'border-slate-200'} flex justify-between items-start group shadow-sm text-left hover:border-orange-200 transition-all`}>
                           <div className="flex gap-4">
-                            <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0">
+                            <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 relative">
+                               {m.isPublished === false && <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center"><span className="text-[9px] font-black text-white bg-slate-900 px-2 py-0.5 rounded-full uppercase tracking-widest">非公開</span></div>}
                                <img src={m.thumbnailUrl || getMaterialThumbnail(m.category)} alt="" className="w-full h-full object-cover" />
                             </div>
                             <div className="text-left"><h4 className="font-black text-slate-800 text-lg text-left">{m.title}</h4><div className="flex flex-wrap gap-2 mt-2 text-left"><span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter text-left">{MATERIAL_CATEGORIES.find(c => c.id === m.category)?.label || m.category || (m.tags && m.tags[0])}</span></div><a href={m.url} target="_blank" className="text-orange-600 text-xs font-black flex items-center gap-1 mt-4 hover:underline text-left uppercase">Open <LinkIcon size={12} /></a></div>
                           </div>
                           <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all text-left">
-                            <button onClick={() => { setEditingMaterial(m); setMaterialForm({ ...m, category: m.category || 'scratch' }); window.scrollTo(0,0); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 transition-colors"><Edit2 size={14} /></button>
+                            <button onClick={() => { setEditingMaterial(m); setMaterialForm({ ...m, category: m.category || 'scratch', isPublished: m.isPublished !== false }); window.scrollTo(0,0); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 transition-colors"><Edit2 size={14} /></button>
                             <button onClick={() => deleteMaterial(m.id)} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={14} /></button>
                           </div>
                         </div>
@@ -982,7 +1247,31 @@ const App = () => {
               <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500 text-left text-slate-900">
                 <header className="flex flex-col md:flex-row justify-between items-start gap-6 text-left">
                   <div className="text-left">
-                    <h2 className="text-3xl font-black tracking-tight text-left text-slate-800">{currentUser.name}様 <span className="text-orange-600 font-light ml-2 uppercase">My Portal</span></h2>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                      <h2 className="text-3xl font-black tracking-tight text-left text-slate-800">{currentUser.name}様 <span className="text-orange-600 font-light ml-2 uppercase">My Portal</span></h2>
+                      {currentUser.role === 'parent' && currentUser.allChildren && currentUser.allChildren.length > 1 && (
+                        <select 
+                          value={currentUser.childId} 
+                          onChange={(e) => {
+                             const selectedChild = currentUser.allChildren.find(c => c.id === e.target.value);
+                             if(selectedChild) {
+                               setCurrentUser({
+                                 ...currentUser,
+                                 childId: selectedChild.id,
+                                 childName: selectedChild.name,
+                                 name: `${selectedChild.name}の保護者`,
+                                 nextClassDate: selectedChild.nextClassDate
+                               });
+                             }
+                          }}
+                          className="bg-orange-100 text-orange-700 font-bold px-4 py-2 rounded-xl text-sm border-2 border-transparent hover:border-orange-200 outline-none focus:ring-2 focus:ring-orange-500 cursor-pointer shadow-sm appearance-none"
+                        >
+                          {currentUser.allChildren.map(child => (
+                            <option key={child.id} value={child.id}>{child.name} の記録を見る</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                     <p className="text-slate-400 text-sm font-medium mt-1 text-left">今日学んだことや作品を記録して成長をポートフォリオに残しましょう。</p>
                   </div>
                   <div className="shrink-0">
@@ -1147,6 +1436,38 @@ const App = () => {
                   </div>
                 )}
 
+                {/* メッセージ機能 (受講生・保護者用) */}
+                {(() => {
+                   const studentIdContext = currentUser.role === 'student' ? currentUser.studentId : currentUser.childId;
+                   const studentMessages = messages.filter(m => m.studentId === studentIdContext);
+                   return (
+                     <div className="space-y-6">
+                       <h3 className="text-xl font-black text-slate-800 flex items-center gap-3"><MessageSquare size={22} className="text-orange-500" /> 先生からのメッセージ</h3>
+                       <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200 shadow-sm flex flex-col h-[400px]">
+                         <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-4">
+                            {studentMessages.map(msg => {
+                              const isMe = msg.senderId === (currentUser.role === 'student' ? currentUser.studentId : currentUser.childId);
+                              return (
+                                <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                  <div className={`max-w-[85%] rounded-2xl px-5 py-3 ${isMe ? 'bg-orange-500 text-white rounded-tr-sm' : 'bg-slate-100 text-slate-800 rounded-tl-sm'}`}>
+                                    <p className="text-[10px] font-black tracking-widest uppercase mb-1 opacity-80">{msg.senderName}</p>
+                                    <p className="text-sm font-medium whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                                    <p className="text-[9px] text-right mt-2 opacity-70 font-bold">{msg.createdAt ? new Date(msg.createdAt.toMillis()).toLocaleString([], {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}) : '送信中...'}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {studentMessages.length === 0 && <p className="text-center text-slate-400 font-bold text-xs uppercase tracking-widest mt-20">メッセージはまだありません</p>}
+                         </div>
+                         <form onSubmit={(e) => sendMessage(e, 'admin', studentIdContext)} className="flex gap-3 shrink-0 pt-4 border-t border-slate-100">
+                            <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="メッセージを入力..." className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-orange-500" />
+                            <button type="submit" className="bg-slate-900 text-white px-6 rounded-xl font-black text-sm tracking-widest uppercase hover:bg-orange-600 transition-colors shadow-md">送信</button>
+                         </form>
+                       </div>
+                     </div>
+                   );
+                })()}
+
                 {/* 成長の軌跡 */}
                 <div className="space-y-6">
                   <h3 className="text-xl font-black text-slate-800 flex items-center gap-3"><ImageIcon size={22} className="text-orange-500" /> 成長の軌跡</h3>
@@ -1209,8 +1530,8 @@ const App = () => {
                 <div className="space-y-12">
                   {[...MATERIAL_CATEGORIES, { id: 'other', label: 'その他' }].map(category => {
                     const categoryMaterials = category.id === 'other'
-                      ? materials.filter(m => !MATERIAL_CATEGORIES.some(c => c.id === m.category))
-                      : materials.filter(m => m.category === category.id);
+                      ? materials.filter(m => m.isPublished !== false && !MATERIAL_CATEGORIES.some(c => c.id === m.category))
+                      : materials.filter(m => m.isPublished !== false && m.category === category.id);
                       
                     if (categoryMaterials.length === 0) return null;
 
@@ -1256,7 +1577,12 @@ const App = () => {
                                   </h4>
                                   
                                   {currentUser.role === 'student' && (() => {
-                                    const hasPending = completionRequests.some(r => r.studentId === currentUser.studentId && r.materialId === m.id && r.status === 'pending');
+                                    // Get all requests for this material by this student
+                                    const studentReqs = completionRequests.filter(r => r.studentId === currentUser.studentId && r.materialId === m.id);
+                                    // Find latest pending or rejected
+                                    const hasPending = studentReqs.some(r => r.status === 'pending');
+                                    const hasRejected = studentReqs.some(r => r.status === 'rejected') && !hasPending && !isCompleted;
+                                    
                                     let buttonState = {
                                       bg: 'bg-slate-100 text-slate-500 hover:bg-orange-600 hover:text-white border border-slate-200 hover:border-transparent hover:shadow-lg',
                                       icon: <Star size={18} />,
@@ -1278,17 +1604,27 @@ const App = () => {
                                         text: '承認待ち',
                                         disabled: true
                                       };
+                                    } else if (hasRejected) {
+                                       buttonState = {
+                                         bg: 'bg-rose-100 text-rose-600 border border-rose-200 hover:bg-rose-500 hover:text-white hover:border-transparent shadow-sm',
+                                         icon: <Menu size={18} />, // or another icon like AlertCircle
+                                         text: '再挑戦して提出!',
+                                         disabled: false
+                                       };
                                     }
 
                                     return (
-                                      <button
-                                        onClick={(e) => { if (!buttonState.disabled) toggleMaterialComplete(e, m.id) }}
-                                        disabled={buttonState.disabled}
-                                        className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest transition-all duration-300 ${buttonState.bg}`}
-                                      >
-                                        {buttonState.icon}
-                                        {buttonState.text}
-                                      </button>
+                                      <>
+                                        {hasRejected && <p className="text-[10px] text-rose-500 font-bold mb-1 text-center animate-pulse">先生から差し戻しがありました確認してね</p>}
+                                        <button
+                                          onClick={(e) => { if (!buttonState.disabled) toggleMaterialComplete(e, m.id) }}
+                                          disabled={buttonState.disabled}
+                                          className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest transition-all duration-300 ${buttonState.bg}`}
+                                        >
+                                          {buttonState.icon}
+                                          {buttonState.text}
+                                        </button>
+                                      </>
                                     );
                                   })()}
                                   {currentUser.role === 'parent' && (
@@ -1308,7 +1644,7 @@ const App = () => {
                     );
                   })}
                   
-                  {materials.length === 0 && (
+                  {materials.filter(m => m.isPublished !== false).length === 0 && (
                     <div className="py-20 bg-white rounded-3xl border border-dashed border-slate-200 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">
                       現在、公開されている教材はありません
                     </div>
