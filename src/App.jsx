@@ -1643,29 +1643,31 @@ const App = () => {
                             {record.comment && <div className={`mt-4 border p-5 rounded-2xl ${record.recordType === 'goal' ? 'bg-emerald-50/70 border-emerald-100' : 'bg-orange-50/70 border-orange-100'}`}><div className={`flex items-center gap-2 font-black text-[10px] uppercase tracking-widest mb-2 ${record.recordType === 'goal' ? 'text-emerald-600' : 'text-orange-600'}`}><MessageSquare size={12} /> 講師コメント</div><p className="text-sm text-slate-700 font-bold italic leading-relaxed">"{record.comment}"</p></div>}
 
                             {/* 保護者コメントセクション */}
-                            {currentUser.role === 'parent' && (
+                            {(currentUser.role === 'parent' || (currentUser.role === 'student' && record.parentComment)) && (
                               <div className="mt-4 bg-sky-50 border border-sky-100 rounded-2xl p-4">
                                 <div className="flex items-center gap-2 font-black text-[10px] uppercase tracking-widest mb-2 text-sky-600"><MessageSquare size={12} /> 保護者コメント</div>
                                 {record.parentComment && <p className="text-sm text-slate-700 font-bold italic mb-3">"{record.parentComment}"</p>}
-                                <div className="flex gap-2">
-                                  <input
-                                    type="text"
-                                    placeholder="応援メッセージを送ろう！"
-                                    value={parentComment[record.id] || ''}
-                                    onChange={e => setParentComment({ ...parentComment, [record.id]: e.target.value })}
-                                    className="flex-1 bg-white border border-sky-200 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-sky-400"
-                                  />
-                                  <button
-                                    onClick={async () => {
-                                      try {
-                                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'learning_records', record.id), { parentComment: parentComment[record.id] || '' });
-                                        setSaveMessage('保護者コメントを送信しました');
-                                        setTimeout(() => setSaveMessage(''), 3000);
-                                      } catch(e) { setSaveMessage('送信失敗'); }
-                                    }}
-                                    className="bg-sky-500 text-white font-bold px-4 py-2 rounded-xl text-xs hover:bg-sky-600 transition-colors"
-                                  >送信</button>
-                                </div>
+                                {currentUser.role === 'parent' && (
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      placeholder="応援メッセージを送ろう！"
+                                      value={parentComment[record.id] || ''}
+                                      onChange={e => setParentComment({ ...parentComment, [record.id]: e.target.value })}
+                                      className="flex-1 bg-white border border-sky-200 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-sky-400"
+                                    />
+                                    <button
+                                      onClick={async () => {
+                                        try {
+                                          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'learning_records', record.id), { parentComment: parentComment[record.id] || '' });
+                                          setSaveMessage('保護者コメントを送信しました');
+                                          setTimeout(() => setSaveMessage(''), 3000);
+                                        } catch(e) { setSaveMessage('送信失敗'); }
+                                      }}
+                                      className="bg-sky-500 text-white font-bold px-4 py-2 rounded-xl text-xs hover:bg-sky-600 transition-colors"
+                                    >送信</button>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>

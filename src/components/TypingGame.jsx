@@ -68,16 +68,26 @@ const WORD_LIST = [
 
 // --- Stage definitions ---
 const STAGES = [
-  { id: 1, name: 'スライム',    emoji: '🟢', hp: 30,  atk: 3,  minLv: 1, desc: 'よわよわのスライム。ウォームアップにどうぞ！' },
-  { id: 2, name: 'コウモリ',   emoji: '🦇', hp: 60,  atk: 6,  minLv: 1, desc: 'すばやく飛び回るコウモリだ！' },
-  { id: 3, name: 'ゴブリン',   emoji: '👺', hp: 100, atk: 10, minLv: 1, desc: 'いたずら好きのゴブリンが現れた！' },
-  { id: 4, name: 'オーク',     emoji: '👹', hp: 150, atk: 16, minLv: 2, desc: 'でかくて強いオーク！Lv2以上推奨。' },
-  { id: 5, name: 'スケルトン', emoji: '💀', hp: 220, atk: 24, minLv: 2, desc: 'ガシャガシャうごくスケルトン！' },
-  { id: 6, name: 'ウィッチ',   emoji: '🧙', hp: 300, atk: 33, minLv: 3, desc: '強力な呪文を使うウィッチ。Lv3以上推奨！' },
-  { id: 7, name: 'ドラゴン',   emoji: '🐉', hp: 400, atk: 44, minLv: 3, desc: '炎をはくドラゴン！かなり強い！' },
-  { id: 8, name: 'ダークナイト',emoji: '🛡️', hp: 520, atk: 57, minLv: 4, desc: '暗黒騎士が立ちはだかる！Lv4以上推奨。' },
-  { id: 9, name: 'デーモン',   emoji: '😈', hp: 680, atk: 72, minLv: 4, desc: '地獄から来た悪魔！Lv5でないと勝てないかも…' },
-  { id: 10, name: 'ラスボス',  emoji: '👑', hp: 900, atk: 90, minLv: 5, desc: '伝説の魔王！最強のキャラクターで挑め！' },
+  { id: 1, name: 'スライム',     emoji: '🟢', hp: 30,  atk: 3,  minLv: 1, desc: 'よわよわのスライム。ウォームアップにどうぞ！',
+    bg: 'from-emerald-400 via-green-500 to-teal-600' },
+  { id: 2, name: 'コウモリ',    emoji: '🦇', hp: 60,  atk: 6,  minLv: 1, desc: 'すばやく飛び回るコウモリだ！',
+    bg: 'from-slate-700 via-slate-800 to-slate-900' },
+  { id: 3, name: 'ゴブリン',    emoji: '👺', hp: 100, atk: 10, minLv: 1, desc: 'いたずら好きのゴブリンが現れた！',
+    bg: 'from-lime-600 via-green-700 to-emerald-800' },
+  { id: 4, name: 'オーク',      emoji: '👹', hp: 150, atk: 16, minLv: 2, desc: 'でかくて強いオーク！Lv2以上推奨。',
+    bg: 'from-orange-700 via-red-800 to-stone-900' },
+  { id: 5, name: 'スケルトン',  emoji: '💀', hp: 220, atk: 24, minLv: 2, desc: 'ガシャガシャうごくスケルトン！',
+    bg: 'from-gray-800 via-zinc-900 to-black' },
+  { id: 6, name: 'ウィッチ',    emoji: '🧙', hp: 300, atk: 33, minLv: 3, desc: '強力な呪文を使うウィッチ。Lv3以上推奨！',
+    bg: 'from-purple-800 via-violet-900 to-indigo-950' },
+  { id: 7, name: 'ドラゴン',    emoji: '🐉', hp: 400, atk: 44, minLv: 3, desc: '炎をはくドラゴン！かなり強い！',
+    bg: 'from-rose-700 via-red-800 to-orange-900' },
+  { id: 8, name: 'ダークナイト', emoji: '🛡️', hp: 520, atk: 57, minLv: 4, desc: '暗黒騎士が立ちはだかる！Lv4以上推奨。',
+    bg: 'from-slate-900 via-zinc-900 to-neutral-900' },
+  { id: 9, name: 'デーモン',    emoji: '😈', hp: 680, atk: 72, minLv: 4, desc: '地獄から来た悪魔！Lv5でないと勝てないかも…',
+    bg: 'from-red-950 via-rose-900 to-orange-950' },
+  { id: 10, name: 'ラスボス',   emoji: '👑', hp: 900, atk: 90, minLv: 5, desc: '伝説の魔王！最強のキャラクターで挑め！',
+    bg: 'from-yellow-900 via-amber-950 to-stone-950' },
 ];
 
 // --- Player stats mapping by level (1-5) ---
@@ -337,53 +347,57 @@ const TypingGame = ({ studentId, completedCount, totalMaterials }) => {
   // SCREEN: BATTLE
   // =========================
   if (screen === 'battle' && selectedStage) {
-    const enemyHpPct = Math.max(0, (enemyHp / selectedStage.hp) * 100);
-    const playerHpPct = Math.max(0, (playerHp / maxHp) * 100);
     return (
       <div className="space-y-4 animate-in fade-in duration-300">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <button onClick={() => { clearInterval(enemyTimerRef.current); setScreen('select'); }} className="p-2 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-rose-500 transition-colors">
-            <X size={16} />
-          </button>
-          <h3 className="font-black text-slate-800 text-lg">⚔️ Stage {selectedStage.id}: {selectedStage.name}</h3>
-        </div>
+        {/* Battlefield background panel */}
+        <div className={`relative rounded-3xl overflow-hidden bg-gradient-to-br ${selectedStage.bg} p-5 shadow-2xl`}>
+          {/* subtle grid overlay for texture */}
+          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'repeating-linear-gradient(0deg,transparent,transparent 30px,rgba(255,255,255,.1) 30px,rgba(255,255,255,.1) 31px),repeating-linear-gradient(90deg,transparent,transparent 30px,rgba(255,255,255,.1) 30px,rgba(255,255,255,.1) 31px)' }} />
 
-        {/* Battle field */}
-        <div className="grid grid-cols-2 gap-4">
-          {/* Player side */}
-          <div className={`bg-white rounded-2xl border-2 border-sky-200 p-4 text-center transition-transform ${shakePlayer ? 'translate-x-2 border-rose-400' : ''}`}>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">あなた</p>
-            <div className="w-16 h-16 mx-auto mb-2 flex items-center justify-center">
-              <img src={charInfo.imageUrl} alt={charInfo.name} className="w-full h-full object-contain" onError={e => { e.target.style.display='none'; }} />
-            </div>
-            <p className="text-xs font-black text-slate-600 mb-2">Lv.{playerLevel} | HP {playerHp}/{maxHp}</p>
-            <HpBar current={playerHp} max={maxHp} color="bg-sky-400" />
+          {/* Header */}
+          <div className="relative flex items-center gap-3 mb-4">
+            <button onClick={() => { clearInterval(enemyTimerRef.current); setScreen('select'); }} className="p-2 bg-white/20 hover:bg-white/30 rounded-xl text-white transition-colors backdrop-blur-sm">
+              <X size={16} />
+            </button>
+            <h3 className="font-black text-white text-lg drop-shadow">⚔️ Stage {selectedStage.id}: {selectedStage.name}</h3>
           </div>
 
-          {/* Enemy side */}
-          <div className={`bg-white rounded-2xl border-2 border-rose-200 p-4 text-center transition-transform ${shakeEnemy ? '-translate-x-2 border-orange-500' : ''}`}>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">てき</p>
-            <div className="w-16 h-16 mx-auto mb-2 flex items-center justify-center text-5xl">
-              {selectedStage.emoji}
+          {/* Combatant panels */}
+          <div className="relative grid grid-cols-2 gap-3">
+            {/* Player side */}
+            <div className={`bg-white/10 backdrop-blur-sm rounded-2xl border border-white/30 p-4 text-center transition-transform duration-100 ${shakePlayer ? 'translate-x-2' : ''}`}>
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/70 mb-1">あなた</p>
+              <div className="w-16 h-16 mx-auto mb-2 flex items-center justify-center">
+                <img src={charInfo.imageUrl} alt={charInfo.name} className="w-full h-full object-contain drop-shadow-lg" onError={e => { e.target.style.display='none'; }} />
+              </div>
+              <p className="text-xs font-black text-white mb-2">Lv.{playerLevel} | HP {playerHp}/{maxHp}</p>
+              <HpBar current={playerHp} max={maxHp} color="bg-sky-400" />
             </div>
-            <p className="text-xs font-black text-slate-600 mb-2">{selectedStage.name} HP {Math.max(0, enemyHp)}/{selectedStage.hp}</p>
-            <HpBar current={enemyHp} max={selectedStage.hp} color="bg-rose-400" />
+
+            {/* Enemy side */}
+            <div className={`bg-black/20 backdrop-blur-sm rounded-2xl border border-white/20 p-4 text-center transition-transform duration-100 ${shakeEnemy ? '-translate-x-2' : ''}`}>
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/70 mb-1">てき</p>
+              <div className="w-16 h-16 mx-auto mb-2 flex items-center justify-center text-5xl filter drop-shadow-lg">
+                {selectedStage.emoji}
+              </div>
+              <p className="text-xs font-black text-white mb-2">{selectedStage.name} HP {Math.max(0, enemyHp)}/{selectedStage.hp}</p>
+              <HpBar current={enemyHp} max={selectedStage.hp} color="bg-rose-400" />
+            </div>
+          </div>
+
+          {/* Word to type — inside field */}
+          <div className="relative mt-4 bg-black/40 backdrop-blur-sm rounded-2xl p-5 text-center border border-white/10">
+            <p className="text-white/60 text-[10px] font-bold mb-2 uppercase tracking-widest">つぎの単語をタイピング！</p>
+            {currentWord && (
+              <>
+                <p className="text-white text-4xl font-black mb-1 tracking-widest">{currentWord.kana}</p>
+                <p className="text-white/50 text-base font-mono font-bold tracking-widest">[{currentWord.romaji}]</p>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Word to type */}
-        <div className="bg-slate-900 rounded-2xl p-6 text-center">
-          <p className="text-slate-400 text-xs font-bold mb-3 uppercase tracking-widest">つぎの単語をタイピング！</p>
-          {currentWord && (
-            <>
-              <p className="text-white text-4xl font-black mb-2 tracking-widest">{currentWord.kana}</p>
-              <p className="text-slate-400 text-lg font-mono font-bold tracking-widest">[{currentWord.romaji}]</p>
-            </>
-          )}
-        </div>
-
-        {/* Input */}
+        {/* Input (outside the field) */}
         <form onSubmit={handleSubmit} className="flex gap-3">
           <input
             ref={inputRef}
@@ -407,7 +421,7 @@ const TypingGame = ({ studentId, completedCount, totalMaterials }) => {
         </form>
 
         {/* Battle log */}
-        <div ref={logRef} className="bg-slate-50 rounded-2xl border border-slate-200 p-4 h-32 overflow-y-auto space-y-1">
+        <div ref={logRef} className="bg-slate-50 rounded-2xl border border-slate-200 p-4 h-28 overflow-y-auto space-y-1">
           {battleLog.map(log => (
             <p key={log.id} className={`text-xs font-bold ${log.type === 'player' ? 'text-orange-600' : log.type === 'enemy' ? 'text-rose-500' : 'text-slate-500'}`}>
               {log.msg}
