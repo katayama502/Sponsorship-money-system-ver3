@@ -135,7 +135,7 @@ const App = () => {
   const [editingStudent, setEditingStudent] = useState(null);
   const [activeStudentDetail, setActiveStudentDetail] = useState(null);
   const [studentForm, setStudentForm] = useState({
-    name: '', school: '', age: '', courseId: 'premium', remarks: '', nextClassDate: '',
+    name: '', school: '', age: '', remarks: '', nextClassDate: '',
     studentLoginId: '', studentPassword: '', parentLoginId: '', parentPassword: ''
   });
   const [generatedCreds, setGeneratedCreds] = useState(null);
@@ -388,7 +388,7 @@ const App = () => {
         setGeneratedCreds({ student: { id: sId, pw: sPw }, parent: { id: pId, pw: pPw }, name: studentForm.name });
         setSaveMessage('登録完了');
       }
-      setStudentForm({ name: '', school: '', age: '', courseId: 'premium', remarks: '', nextClassDate: '', studentLoginId: '', studentPassword: '', parentLoginId: '', parentPassword: '' });
+      setStudentForm({ name: '', school: '', age: '', remarks: '', nextClassDate: '', studentLoginId: '', studentPassword: '', parentLoginId: '', parentPassword: '' });
       setEditingStudent(null);
     } catch (e) { console.error(e); setSaveMessage(`保存エラー: ${e.message}`); }
     setTimeout(() => setSaveMessage(''), 5000);
@@ -909,10 +909,43 @@ const App = () => {
                         <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 text-left">次回の授業日</label><input type="date" value={studentForm.nextClassDate} onChange={e => setStudentForm({ ...studentForm, nextClassDate: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-left" /></div>
 
                         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4 text-left">
-                          <div className="flex justify-between items-center text-left"><span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Credentials</span><button type="button" onClick={fillCredentials} className="text-[9px] bg-slate-200 px-2 py-1 rounded font-black text-slate-500 uppercase tracking-widest hover:bg-slate-300">Auto</button></div>
-                          <div className="grid grid-cols-1 gap-2 text-left"><input type="text" placeholder="生徒ID" value={studentForm.studentLoginId} onChange={e => setStudentForm({ ...studentForm, studentLoginId: e.target.value })} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-left" /><input type="text" placeholder="生徒PW" value={studentForm.studentPassword} onChange={e => setStudentForm({ ...studentForm, studentPassword: e.target.value })} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-left" /><input type="text" placeholder="保護者ID" value={studentForm.parentLoginId} onChange={e => setStudentForm({ ...studentForm, parentLoginId: e.target.value })} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-left" /><input type="text" placeholder="保護者PW" value={studentForm.parentPassword} onChange={e => setStudentForm({ ...studentForm, parentPassword: e.target.value })} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-left" /></div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">ログイン情報</span>
+                            <button type="button" onClick={fillCredentials} className="text-[9px] bg-slate-200 px-2 py-1 rounded font-black text-slate-500 uppercase tracking-widest hover:bg-slate-300">Auto</button>
+                          </div>
+
+                          {/* Student credentials */}
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">生徒アカウント</p>
+                            <input type="text" placeholder="生徒ID" value={studentForm.studentLoginId} onChange={e => setStudentForm({ ...studentForm, studentLoginId: e.target.value })} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold" />
+                            <input type="text" placeholder="生徒PW" value={studentForm.studentPassword} onChange={e => setStudentForm({ ...studentForm, studentPassword: e.target.value })} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold" />
+                          </div>
+
+                          {/* Parent credentials — sibling link */}
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">保護者アカウント</p>
+                              {students.length > 0 && (
+                                <select
+                                  className="text-[9px] bg-white border border-slate-200 rounded px-2 py-1 font-bold text-slate-500 outline-none"
+                                  value=""
+                                  onChange={e => {
+                                    const sibling = students.find(s => s.id === e.target.value);
+                                    if (sibling) setStudentForm(prev => ({ ...prev, parentLoginId: sibling.parentLoginId, parentPassword: sibling.parentPassword }));
+                                  }}
+                                >
+                                  <option value="">兄弟姉妹と紐付け…</option>
+                                  {students.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name} の保護者を使用</option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                            <input type="text" placeholder="保護者ID" value={studentForm.parentLoginId} onChange={e => setStudentForm({ ...studentForm, parentLoginId: e.target.value })} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold" />
+                            <input type="text" placeholder="保護者PW" value={studentForm.parentPassword} onChange={e => setStudentForm({ ...studentForm, parentPassword: e.target.value })} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold" />
+                            <p className="text-[9px] text-slate-400 leading-relaxed pt-0.5">💡 同じ保護者ID/PWを複数の生徒に設定すると、1つのアカウントで兄弟姉妹を一括管理できます。</p>
+                          </div>
                         </div>
-                        <div className="text-left"><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 text-left">プラン</label><select value={studentForm.courseId} onChange={e => setStudentForm({ ...studentForm, courseId: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-left outline-none appearance-none">{COURSE_BASES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
                         <button type="submit" className="w-full bg-orange-600 text-white font-black py-4 rounded-xl shadow-lg hover:bg-orange-700 transition-all flex items-center justify-center gap-2 active:scale-95 text-sm uppercase tracking-widest">{editingStudent ? 'UPDATE' : 'ID発行と登録'}</button>
                       </form>
                     </div>
