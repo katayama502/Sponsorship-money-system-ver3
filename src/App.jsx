@@ -1345,6 +1345,7 @@ const App = () => {
                   {currentUser.role === 'student' && (
                     <button onClick={() => setActiveTab('game')} className={`px-4 py-2 rounded-xl text-sm font-black transition-all ${activeTab === 'game' ? 'bg-violet-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}>🎮 ゲームで遊ぶ</button>
                   )}
+                  <button onClick={() => setActiveTab('growth')} className={`px-4 py-2 rounded-xl text-sm font-black transition-all ${activeTab === 'growth' ? 'bg-teal-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}>📚 成長の軌跡</button>
                 </div>
                 <button onClick={handleLogout} className="text-slate-400 hover:text-rose-500 transition-colors ml-2 bg-slate-100 p-2.5 rounded-full"><LogOut size={20} /></button>
               </div>
@@ -1365,6 +1366,7 @@ const App = () => {
                {currentUser.role === 'student' && (
                  <button onClick={() => { setActiveTab('game'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'game' ? 'bg-violet-100 text-violet-600' : 'text-slate-500 hover:bg-slate-50'}`}>🎮 ゲームで遊ぶ</button>
                )}
+               <button onClick={() => { setActiveTab('growth'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'growth' ? 'bg-teal-100 text-teal-600' : 'text-slate-500 hover:bg-slate-50'}`}>📚 成長の軌跡</button>
             </div>
             <div className="p-4 border-t border-slate-100">
               <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-black hover:bg-slate-50 text-rose-500 rounded-xl transition-all"><LogOut size={18} /> ログアウト</button>
@@ -1804,6 +1806,151 @@ const App = () => {
                     totalMaterials={materials.length || 1}
                     customStats={studentData?.customStats || { hp: 0, atk: 0, def: 0 }}
                   />
+                </div>
+              );
+            })()}
+
+            {/* 成長の軌跡タブ */}
+            {(currentUser.role === 'student' || currentUser.role === 'parent') && activeTab === 'growth' && (() => {
+              const studentIdCtx = currentUser.role === 'student' ? currentUser.studentId : currentUser.childId;
+              const studentData = students.find(s => s.id === studentIdCtx);
+              const myRecords = learningRecords
+                .filter(r => r.studentId === studentIdCtx)
+                .sort((a, b) => {
+                  const da = a.lessonDate || (a.createdAt?.seconds ? new Date(a.createdAt.seconds * 1000).toISOString().slice(0, 10) : '');
+                  const db2 = b.lessonDate || (b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000).toISOString().slice(0, 10) : '');
+                  return db2.localeCompare(da); // newest first
+                });
+
+              // Group by lessonDate
+              const grouped = {};
+              myRecords.forEach(r => {
+                const key = r.lessonDate || (r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toISOString().slice(0, 10) : '日付なし');
+                if (!grouped[key]) grouped[key] = [];
+                grouped[key].push(r);
+              });
+              const groupedEntries = Object.entries(grouped);
+
+              const pointsEarned = myRecords.filter(r => r.commentPointed).length;
+              const completedCount = studentData?.completedMaterials?.length || 0;
+              const totalMat = materials.length || 1;
+              const progressPercentage = Math.min(100, Math.floor((completedCount / totalMat) * 100));
+              const customStats = studentData?.customStats || { hp: 0, atk: 0, def: 0 };
+
+              return (
+                <div className="space-y-8 animate-in fade-in duration-500">
+                  <header>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">📚 成長の軌跡</h2>
+                    <p className="text-sm text-slate-500 font-medium mt-1">これまでの学びの記録をふり返ろう！</p>
+                  </header>
+
+                  {/* サマリーカード */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {[
+                      { label: '総授業回数', value: `${groupedEntries.length}回`, icon: '📅', color: 'from-teal-400 to-emerald-500' },
+                      { label: '記録数', value: `${myRecords.length}件`, icon: '📝', color: 'from-sky-400 to-blue-500' },
+                      { label: '獲得ポイント', value: `${pointsEarned}pt`, icon: '🌟', color: 'from-amber-400 to-orange-500' },
+                      { label: 'カリキュラム進捗', value: `${progressPercentage}%`, icon: '🎯', color: 'from-violet-400 to-purple-500' },
+                    ].map(({ label, value, icon, color }) => (
+                      <div key={label} className={`bg-gradient-to-br ${color} rounded-2xl p-5 text-white shadow-lg`}>
+                        <div className="text-3xl mb-2">{icon}</div>
+                        <p className="text-[10px] font-black uppercase tracking-widest opacity-80">{label}</p>
+                        <p className="text-2xl font-black">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* キャラクターステータス */}
+                  {(customStats.hp > 0 || customStats.atk > 0 || customStats.def > 0) && (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-5 flex items-center gap-6 flex-wrap shadow-sm">
+                      <p className="text-sm font-black text-slate-700">⚔️ キャラクターボーナス</p>
+                      <span className="text-sm font-bold text-rose-500">❤️ HP+{customStats.hp}</span>
+                      <span className="text-sm font-bold text-amber-500">⚡ ATK+{customStats.atk}</span>
+                      <span className="text-sm font-bold text-sky-500">🛡️ DEF+{customStats.def}</span>
+                    </div>
+                  )}
+
+                  {/* タイムライン */}
+                  {groupedEntries.length === 0 ? (
+                    <div className="text-center py-20 text-slate-400">
+                      <div className="text-5xl mb-4">📭</div>
+                      <p className="font-bold">まだ記録がありません</p>
+                      <p className="text-sm mt-1">授業のあとに目標や振り返りを投稿してみよう！</p>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      {/* vertical line */}
+                      <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-teal-300 via-sky-300 to-violet-300 rounded-full" />
+                      <div className="space-y-10 pl-16">
+                        {groupedEntries.map(([date, records], gi) => (
+                          <div key={date} className="relative">
+                            {/* date badge */}
+                            <div className="absolute -left-16 top-0 flex flex-col items-center">
+                              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center shadow-lg text-white font-black text-xs text-center leading-tight border-4 border-white">
+                                {date === '日付なし' ? '??' : (
+                                  <>
+                                    <span className="text-[8px] block">{date.slice(5, 7)}月</span>
+                                    <span className="text-sm block leading-none">{date.slice(8, 10)}</span>
+                                  </>
+                                )}
+                              </div>
+                              <div className="w-0.5 flex-1 bg-transparent" />
+                            </div>
+
+                            {/* date label */}
+                            <p className="text-xs font-black text-teal-600 uppercase tracking-widest mb-3">
+                              {date} の授業 — {records.length}件の記録
+                            </p>
+
+                            {/* records for this date */}
+                            <div className="space-y-4">
+                              {records.map(record => (
+                                <div key={record.id} className={`rounded-2xl border p-5 shadow-sm ${record.recordType === 'goal' ? 'bg-emerald-50 border-emerald-100' : 'bg-orange-50 border-orange-100'}`}>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${record.recordType === 'goal' ? 'bg-emerald-500 text-white' : 'bg-orange-500 text-white'}`}>
+                                      {record.recordType === 'goal' ? '🎯 目標' : '📝 振り返り'}
+                                    </span>
+                                    {record.commentPointed && (
+                                      <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-100 text-amber-600">🌟 +1pt</span>
+                                    )}
+                                  </div>
+                                  <h4 className="font-black text-slate-800 text-sm mb-2">{record.title}</h4>
+                                  <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{record.content}</p>
+
+                                  {/* instructor comment */}
+                                  {record.comment && (
+                                    <div className={`mt-4 p-3 rounded-xl border text-sm ${record.recordType === 'goal' ? 'bg-white border-emerald-200' : 'bg-white border-orange-200'}`}>
+                                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">💬 先生のコメント</p>
+                                      <p className="font-bold text-slate-700 italic">"{record.comment}"</p>
+                                    </div>
+                                  )}
+
+                                  {/* parent comment */}
+                                  {record.parentComment && (
+                                    <div className="mt-3 p-3 rounded-xl border border-sky-200 bg-white text-sm">
+                                      <p className="text-[9px] font-black uppercase tracking-widest text-sky-500 mb-1">💙 保護者のコメント</p>
+                                      <p className="font-bold text-slate-700 italic">"{record.parentComment}"</p>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Timeline end badge */}
+                        <div className="relative">
+                          <div className="absolute -left-16 top-0">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center shadow-lg text-white text-xl border-4 border-white">🌱</div>
+                          </div>
+                          <div className="ml-0 py-4">
+                            <p className="text-sm font-black text-violet-500">これからも頑張ろう！</p>
+                            <p className="text-xs text-slate-400 font-medium">記録を続けて成長の軌跡を積み上げよう。</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}
