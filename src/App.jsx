@@ -399,6 +399,7 @@ const App = () => {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sponsors', id));
       setSaveMessage('削除しました');
     } catch (e) { setSaveMessage('失敗'); }
+    setTimeout(() => setSaveMessage(''), 3000);
   };
 
   const deleteStudentCascade = async (studentId) => {
@@ -436,6 +437,7 @@ const App = () => {
       console.error("Delete cascade failed: ", e);
       setSaveMessage('削除中にエラーが発生しました');
     }
+    setTimeout(() => setSaveMessage(''), 3000);
   };
 
   const saveMaterial = async (e) => {
@@ -451,6 +453,7 @@ const App = () => {
       setEditingMaterial(null);
       setSaveMessage('教材保存完了');
     } catch (e) { setSaveMessage('エラー'); }
+    setTimeout(() => setSaveMessage(''), 3000);
   };
 
   const submitLearningRecord = async (e) => {
@@ -459,9 +462,10 @@ const App = () => {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'learning_records'), {
         ...newLearningRecord, studentId: currentUser.studentId, studentName: currentUser.name, date: new Date().toISOString(), createdAt: serverTimestamp(), comment: ''
       });
-      setNewLearningRecord({ title: '', content: {}, imageUrl: '', fileUrl: '', linkUrl: '' });
+      setNewLearningRecord({ title: '', content: {}, imageUrl: '', fileUrl: '', linkUrl: '', lessonDate: new Date().toISOString().slice(0, 10) });
       setSaveMessage('記録しました');
     } catch (e) { setSaveMessage('失敗'); }
+    setTimeout(() => setSaveMessage(''), 3000);
   };
 
   const sendMessage = async (e, receiverId, studentIdCtx) => {
@@ -563,6 +567,7 @@ const App = () => {
       }
       setSaveMessage('送信しました');
     } catch (e) { setSaveMessage('失敗'); }
+    setTimeout(() => setSaveMessage(''), 3000);
   };
 
   const postAnnouncement = async (e) => {
