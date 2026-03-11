@@ -1706,87 +1706,6 @@ const App = () => {
                    );
                 })()}
 
-                {/* 成長の軌跡 */}
-                <div className="space-y-6">
-                  <h3 className="text-xl font-black text-slate-800 flex items-center gap-3"><ImageIcon size={22} className="text-orange-500" /> 成長の軌跡</h3>
-                  <div className="grid grid-cols-1 gap-6">
-                    {learningRecords.length === 0
-                      ? <div className="bg-white rounded-3xl border border-dashed border-slate-200 p-20 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">記録が見つかりません</div>
-                      : learningRecords.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()).map(record => (
-                        <div key={record.id} className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden flex flex-col md:flex-row shadow-sm hover:shadow-md transition-all group">
-                          {record.imageUrl && (
-                            <div className="md:w-72 h-56 md:h-auto bg-slate-100 flex-shrink-0 overflow-hidden"><img src={record.imageUrl} alt="成果物" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?auto=format&fit=crop&q=80&w=400'; }} /></div>
-                          )}
-                          <div className="p-8 flex-1 space-y-5">
-                            <div>
-                              <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${record.recordType === 'goal' ? 'text-emerald-600' : 'text-orange-600'}`}>
-                                {new Date(record.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}  |  {record.recordType === 'goal' ? '目標シート' : '振り返りシート'}
-                              </p>
-                              <h4 className="text-2xl font-black text-slate-800 tracking-tight">{record.title}</h4>
-                            </div>
-
-                            {/* 記録内容の表示 */}
-                            {typeof record.content === 'object' ? (
-                              reflectionTemplate.filter(i => i.category === record.recordType).length > 0 ? (
-                                reflectionTemplate.filter(i => i.category === record.recordType).map(item => record.content[item.id] && (
-                                  <div key={item.id} className="mt-4">
-                                    <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{item.title}</h5>
-                                    <p className="text-sm text-slate-600 leading-relaxed font-medium whitespace-pre-wrap bg-slate-50 p-4 rounded-xl">{record.content[item.id]}</p>
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="mt-4">
-                                  <p className="text-sm text-slate-600 leading-relaxed font-medium whitespace-pre-wrap">{record.content['default'] || Object.values(record.content)[0]}</p>
-                                </div>
-                              )
-                            ) : (
-                              <p className="text-sm text-slate-500 leading-relaxed font-medium whitespace-pre-wrap">{record.content}</p>
-                            )}
-
-                            {/* リンク・ファイルの表示 */}
-                            {record.linkUrl && (
-                              <div className="mt-4 flex items-center gap-2">
-                                <LinkIcon size={16} className={record.recordType === 'goal' ? 'text-emerald-500' : 'text-orange-500'} />
-                                <a href={record.linkUrl} target="_blank" className={`text-sm font-bold hover:underline ${record.recordType === 'goal' ? 'text-emerald-600' : 'text-orange-600'}`}>作品リンクを見る</a>
-                              </div>
-                            )}
-
-                            {record.comment && <div className={`mt-4 border p-5 rounded-2xl ${record.recordType === 'goal' ? 'bg-emerald-50/70 border-emerald-100' : 'bg-orange-50/70 border-orange-100'}`}><div className={`flex items-center gap-2 font-black text-[10px] uppercase tracking-widest mb-2 ${record.recordType === 'goal' ? 'text-emerald-600' : 'text-orange-600'}`}><MessageSquare size={12} /> 講師コメント</div><p className="text-sm text-slate-700 font-bold italic leading-relaxed">"{record.comment}"</p></div>}
-
-                            {/* 保護者コメントセクション */}
-                            {(currentUser.role === 'parent' || (currentUser.role === 'student' && record.parentComment)) && (
-                              <div className="mt-4 bg-sky-50 border border-sky-100 rounded-2xl p-4">
-                                <div className="flex items-center gap-2 font-black text-[10px] uppercase tracking-widest mb-2 text-sky-600"><MessageSquare size={12} /> 保護者コメント</div>
-                                {record.parentComment && <p className="text-sm text-slate-700 font-bold italic mb-3">"{record.parentComment}"</p>}
-                                {currentUser.role === 'parent' && (
-                                  <div className="flex gap-2">
-                                    <input
-                                      type="text"
-                                      placeholder="応援メッセージを送ろう！"
-                                      value={parentComment[record.id] || ''}
-                                      onChange={e => setParentComment({ ...parentComment, [record.id]: e.target.value })}
-                                      className="flex-1 bg-white border border-sky-200 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-sky-400"
-                                    />
-                                    <button
-                                      onClick={async () => {
-                                        try {
-                                          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'learning_records', record.id), { parentComment: parentComment[record.id] || '' });
-                                          setSaveMessage('保護者コメントを送信しました');
-                                          setTimeout(() => setSaveMessage(''), 3000);
-                                        } catch(e) { setSaveMessage('送信失敗'); }
-                                      }}
-                                      className="bg-sky-500 text-white font-bold px-4 py-2 rounded-xl text-xs hover:bg-sky-600 transition-colors"
-                                    >送信</button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    }
-                  </div>
-                </div>
               </div>
             )}
 
@@ -1915,7 +1834,13 @@ const App = () => {
                                     )}
                                   </div>
                                   <h4 className="font-black text-slate-800 text-sm mb-2">{record.title}</h4>
-                                  <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{record.content}</p>
+                                  {typeof record.content === 'object' && record.content !== null ? (
+                                    Object.values(record.content).filter(Boolean).map((v, i) => (
+                                      <p key={i} className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap mb-1">{String(v)}</p>
+                                    ))
+                                  ) : (
+                                    <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{record.content}</p>
+                                  )}
 
                                   {/* instructor comment */}
                                   {record.comment && (
@@ -1925,11 +1850,32 @@ const App = () => {
                                     </div>
                                   )}
 
-                                  {/* parent comment */}
-                                  {record.parentComment && (
+                                  {/* 保護者コメント */}
+                                  {(currentUser.role === 'parent' || (currentUser.role === 'student' && record.parentComment)) && (
                                     <div className="mt-3 p-3 rounded-xl border border-sky-200 bg-white text-sm">
-                                      <p className="text-[9px] font-black uppercase tracking-widest text-sky-500 mb-1">💙 保護者のコメント</p>
-                                      <p className="font-bold text-slate-700 italic">"{record.parentComment}"</p>
+                                      <p className="text-[9px] font-black uppercase tracking-widest text-sky-500 mb-1">💙 保護者コメント</p>
+                                      {record.parentComment && <p className="font-bold text-slate-700 italic mb-2">"{record.parentComment}"</p>}
+                                      {currentUser.role === 'parent' && (
+                                        <div className="flex gap-2">
+                                          <input
+                                            type="text"
+                                            placeholder="応援メッセージを送ろう！"
+                                            value={parentComment[record.id] || ''}
+                                            onChange={e => setParentComment({ ...parentComment, [record.id]: e.target.value })}
+                                            className="flex-1 bg-slate-50 border border-sky-200 rounded-xl px-3 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-sky-400"
+                                          />
+                                          <button
+                                            onClick={async () => {
+                                              try {
+                                                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'learning_records', record.id), { parentComment: parentComment[record.id] || '' });
+                                                setSaveMessage('保護者コメントを送信しました');
+                                                setTimeout(() => setSaveMessage(''), 3000);
+                                              } catch(e) { setSaveMessage('送信失敗'); }
+                                            }}
+                                            className="bg-sky-500 text-white font-bold px-3 py-2 rounded-xl text-xs hover:bg-sky-600 transition-colors"
+                                          >送信</button>
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
