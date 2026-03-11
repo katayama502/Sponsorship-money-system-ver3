@@ -59,6 +59,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot, query, serverTimestamp, addDoc, updateDoc, getDocs, where, limit } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll } from 'firebase/storage';
+import TypingGame from './components/TypingGame.jsx';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -1300,6 +1301,9 @@ const App = () => {
                     )}
                   </button>
                   <button onClick={() => setActiveTab('materials')} className={`px-4 py-2 rounded-xl text-sm font-black transition-all ${activeTab === 'materials' ? 'bg-sky-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}>きょうざいを見る</button>
+                  {currentUser.role === 'student' && (
+                    <button onClick={() => setActiveTab('game')} className={`px-4 py-2 rounded-xl text-sm font-black transition-all ${activeTab === 'game' ? 'bg-violet-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}>🎮 ゲームで遊ぶ</button>
+                  )}
                 </div>
                 <button onClick={handleLogout} className="text-slate-400 hover:text-rose-500 transition-colors ml-2 bg-slate-100 p-2.5 rounded-full"><LogOut size={20} /></button>
               </div>
@@ -1317,6 +1321,9 @@ const App = () => {
             <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
                <button onClick={() => { setActiveTab('mypage'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'mypage' ? 'bg-orange-100 text-orange-600' : 'text-slate-500 hover:bg-slate-50'}`}>マイページ</button>
                <button onClick={() => { setActiveTab('materials'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'materials' ? 'bg-sky-100 text-sky-600' : 'text-slate-500 hover:bg-slate-50'}`}>きょうざいを見る</button>
+               {currentUser.role === 'student' && (
+                 <button onClick={() => { setActiveTab('game'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'game' ? 'bg-violet-100 text-violet-600' : 'text-slate-500 hover:bg-slate-50'}`}>🎮 ゲームで遊ぶ</button>
+               )}
             </div>
             <div className="p-4 border-t border-slate-100">
               <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-black hover:bg-slate-50 text-rose-500 rounded-xl transition-all"><LogOut size={18} /> ログアウト</button>
@@ -1669,6 +1676,25 @@ const App = () => {
                 </div>
               </div>
             )}
+
+            {/* タイピングゲーム (生徒のみ) */}
+            {currentUser.role === 'student' && activeTab === 'game' && (() => {
+              const studentData = students.find(s => s.id === currentUser.studentId);
+              const completedCount = studentData?.completedMaterials?.length || 0;
+              return (
+                <div className="space-y-6 animate-in fade-in duration-500">
+                  <header>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">🎮 タイピングバトル</h2>
+                    <p className="text-sm text-slate-500 font-medium mt-1">カリキュラムをこなしてキャラクターを強くしよう！</p>
+                  </header>
+                  <TypingGame
+                    studentId={currentUser.studentId}
+                    completedCount={completedCount}
+                    totalMaterials={materials.length || 1}
+                  />
+                </div>
+              );
+            })()}
 
             {/* 教材一覧 (受講生・保護者用) */}
             {(currentUser.role === 'student' || currentUser.role === 'parent') && activeTab === 'materials' && (
