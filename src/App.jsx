@@ -57,7 +57,7 @@ import {
 // Firebase imports
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot, query, serverTimestamp, addDoc, updateDoc, getDocs, where } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot, query, serverTimestamp, addDoc, updateDoc, getDocs, where, limit } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll } from 'firebase/storage';
 
 // --- Firebase Configuration ---
@@ -234,7 +234,7 @@ const App = () => {
     const unsubAnnounce = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'announcements'), (snap) => {
       setAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()));
     });
-    const unsubLearning = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'learning_records'), (snap) => {
+    const unsubLearning = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'learning_records'), limit(50)), (snap) => {
       setLearningRecords(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     const unsubMaterials = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'materials'), (snap) => {
@@ -246,7 +246,7 @@ const App = () => {
     const unsubCompletionRequests = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'completion_requests'), (snap) => {
       setCompletionRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)));
     });
-    const unsubMessages = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), (snap) => {
+    const unsubMessages = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), limit(50)), (snap) => {
       setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)));
     });
 
@@ -403,10 +403,17 @@ const App = () => {
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'learning_records', r.id));
       }
       
-      // 2. Delete associated sb3 files (from db, storage cleanup assumes same or separate process)
+      // 2. Delete associated sb3 files (from db and storage)
       const filesToDelete = sb3Files.filter(f => f.studentId === studentId);
       for (const f of filesToDelete) {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sb3_files', f.id));
+        if (f.storagePath) {
+          try {
+            await deleteObject(ref(storage, f.storagePath));
+          } catch (storageErr) {
+            console.error("Storage delete failed for path:", f.storagePath, storageErr);
+          }
+        }
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', studentId, 'sb3_files', f.id));
       }
       
       // 3. Delete associated completion requests
@@ -461,6 +468,7 @@ const App = () => {
         senderName: currentUser.name || (currentUser.role === 'admin' ? '講師・サポーター' : '生徒/保護者'),
         receiverId: receiverId, // If admin sending, it's studentId. If student/parent sending, it's 'admin'.
         studentId: studentIdCtx, // The context student ID for this chat
+        isRead: false,
         createdAt: serverTimestamp(),
       });
       setNewMessage('');
@@ -470,6 +478,28 @@ const App = () => {
       setTimeout(() => setSaveMessage(''), 3000);
     }
   };
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const markMessagesAsRead = async () => {
+      let unreadMsgs = [];
+      if (currentUser.role === 'admin' && activeStudentDetail) {
+        unreadMsgs = messages.filter(m => m.studentId === activeStudentDetail.id && m.receiverId === 'admin' && !m.isRead);
+      } else if ((currentUser.role === 'student' || currentUser.role === 'parent') && activeTab === 'mypage') {
+        const studentIdCtx = currentUser.role === 'student' ? currentUser.studentId : currentUser.childId;
+        unreadMsgs = messages.filter(m => m.studentId === studentIdCtx && m.receiverId === studentIdCtx && !m.isRead);
+      }
+
+      for (const msg of unreadMsgs) {
+        try {
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'messages', msg.id), { isRead: true });
+        } catch (e) {
+          console.error("Failed to mark read", e);
+        }
+      }
+    };
+    markMessagesAsRead();
+  }, [messages, activeTab, activeStudentDetail, currentUser]);
 
   const saveReflectionItem = async (e) => {
     e.preventDefault();
