@@ -117,11 +117,14 @@ const getLevelCharacter = (percentage) => {
 
 const ENEMY_ATTACK_INTERVAL_MS = 3500; // Enemy attacks every 3.5 seconds
 
-const TypingGame = ({ studentId, completedCount, totalMaterials }) => {
+const TypingGame = ({ studentId, completedCount, totalMaterials, customStats = { hp: 0, atk: 0, def: 0 } }) => {
   const progressPercentage = totalMaterials > 0 ? Math.min(100, Math.floor((completedCount / totalMaterials) * 100)) : 0;
   const playerLevel = getPlayerLevel(progressPercentage);
   const charInfo = getLevelCharacter(progressPercentage);
-  const { maxHp, atk: playerAtk } = PLAYER_STATS[playerLevel];
+  const base = PLAYER_STATS[playerLevel];
+  const maxHp = base.maxHp + (customStats.hp || 0);
+  const playerAtk = base.atk + (customStats.atk || 0);
+  const playerDef = customStats.def || 0;
 
   // --- Game Screens: 'select' | 'battle' | 'win' | 'lose' ---
   const [screen, setScreen] = useState('select');
@@ -194,7 +197,8 @@ const TypingGame = ({ studentId, completedCount, totalMaterials }) => {
     }
     enemyTimerRef.current = setInterval(() => {
       setPlayerHp(prev => {
-        const next = prev - selectedStage.atk;
+        const dmg = Math.max(1, selectedStage.atk - playerDef);
+        const next = prev - dmg;
         if (next <= 0) {
           clearInterval(enemyTimerRef.current);
           setScreen('lose');
@@ -202,7 +206,7 @@ const TypingGame = ({ studentId, completedCount, totalMaterials }) => {
         }
         setShakePlayer(true);
         setTimeout(() => setShakePlayer(false), 400);
-        addLog(`💥 ${selectedStage.name}の攻撃！ -${selectedStage.atk}ダメージ`, 'enemy');
+        addLog(`💥 ${selectedStage.name}の攻撃！ -${dmg}ダメージ${playerDef > 0 ? ` (防御${playerDef}軽減)` : ''}`, 'enemy');
         return next;
       });
     }, ENEMY_ATTACK_INTERVAL_MS);
@@ -281,8 +285,13 @@ const TypingGame = ({ studentId, completedCount, totalMaterials }) => {
             <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1">あなたのキャラクター</p>
             <h3 className="text-xl font-black">{charInfo.name}</h3>
             <p className="text-sm text-slate-300 mt-1 font-medium">
-              カリキュラム達成率: {progressPercentage}% &nbsp;|&nbsp; Lv.{playerLevel} &nbsp;|&nbsp; HP:{maxHp} ATK:{playerAtk}
+              Lv.{playerLevel} カリキュラム{progressPercentage}%
             </p>
+            <div className="flex gap-4 mt-2 text-xs font-black">
+              <span className="text-rose-300">❤️ HP:{maxHp}{customStats.hp > 0 ? ` (+${customStats.hp})` : ''}</span>
+              <span className="text-amber-300">⚡ ATK:{playerAtk}{customStats.atk > 0 ? ` (+${customStats.atk})` : ''}</span>
+              <span className="text-sky-300">🛡️ DEF:{playerDef}</span>
+            </div>
           </div>
         </div>
 

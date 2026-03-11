@@ -57,7 +57,7 @@ import {
 // Firebase imports
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot, query, serverTimestamp, addDoc, updateDoc, getDocs, where, limit } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot, query, serverTimestamp, addDoc, updateDoc, getDocs, getDoc, where, limit } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll } from 'firebase/storage';
 import TypingGame from './components/TypingGame.jsx';
 
@@ -551,12 +551,20 @@ const App = () => {
     const record = learningRecords.find(r => r.id === recordId);
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'learning_records', recordId), {
-        comment: adminComment[recordId], commentedAt: serverTimestamp()
+        comment: adminComment[recordId], commentedAt: serverTimestamp(),
+        commentPointed: true,
       });
+      // ポイント付与（初回コメント時のみ）
+      if (record?.studentId && !record.commentPointed) {
+        const studentRef = doc(db, 'artifacts', appId, 'public', 'data', 'students', record.studentId);
+        const studentSnap = await getDoc(studentRef);
+        const currentPoints = studentSnap.exists() ? (studentSnap.data().points || 0) : 0;
+        await updateDoc(studentRef, { points: currentPoints + 1 });
+      }
       // 生徒にコメント通知メッセージを自動送信
       if (record?.studentId) {
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), {
-          text: `📝 「${record.title}」に先生からコメントが届きました。マイページで確認してね！`,
+          text: `📝 「${record.title}」に先生からコメントが届きました。${!record.commentPointed ? '🌟+1ポイントGET！マイページでステータスを強化しよう！' : 'マイページで確認してね！'}`,
           senderId: 'admin',
           senderRole: 'admin',
           senderName: '講師・サポーター (自動通知)',
@@ -1449,6 +1457,74 @@ const App = () => {
                       </div>
                     </div>
                   );
+                 })()}
+
+                {/* ★ ステータス振り分けパネル（生徒のみ） */}
+                {currentUser.role === 'student' && (() => {
+                  const studentData = students.find(s => s.id === currentUser.studentId);
+                  const points = studentData?.points || 0;
+                  const customStats = studentData?.customStats || { hp: 0, atk: 0, def: 0 };
+
+                  const spendPoint = async (stat) => {
+                    if (points <= 0) return;
+                    const studentRef = doc(db, 'artifacts', appId, 'public', 'data', 'students', currentUser.studentId);
+                    await updateDoc(studentRef, {
+                      points: points - 1,
+                      [`customStats.${stat}`]: (customStats[stat] || 0) + 1,
+                    });
+                    setSaveMessage(`⭐ ${stat.toUpperCase()} +1！`);
+                    setTimeout(() => setSaveMessage(''), 2000);
+                  };
+
+                  return (
+                    <div className="bg-white rounded-[2rem] border border-slate-200 shadow-lg p-6 md:p-8">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                        <div>
+                          <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">⭐ キャラクター強化</h3>
+                          <p className="text-xs text-slate-400 font-medium mt-0.5">先生からコメントをもらったときにポイントがもらえるよ！</p>
+                        </div>
+                        <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3">
+                          <span className="text-2xl">🌟</span>
+                          <div>
+                            <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">所持ポイント</p>
+                            <p className="text-3xl font-black text-amber-600 leading-none">{points}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        {[
+                          { key: 'hp',  label: 'HP', icon: '❤️', color: 'from-rose-400 to-pink-500',  desc: '体力アップ' },
+                          { key: 'atk', label: 'ATK', icon: '⚡', color: 'from-orange-400 to-amber-500', desc: '攻撃力アップ' },
+                          { key: 'def', label: 'DEF', icon: '🛡️', color: 'from-sky-400 to-blue-500',  desc: '防御力アップ' },
+                        ].map(({ key, label, icon, color, desc }) => (
+                          <div key={key} className={`bg-gradient-to-br ${color} rounded-2xl p-4 text-white text-center shadow-lg`}>
+                            <div className="text-3xl mb-1">{icon}</div>
+                            <p className="font-black text-xl">{label}</p>
+                            <p className="text-xs opacity-80 font-medium mb-2">{desc}</p>
+                            <p className="text-3xl font-black mb-3">+{customStats[key] || 0}</p>
+                            <button
+                              onClick={() => spendPoint(key)}
+                              disabled={points <= 0}
+                              className={`w-full py-2 rounded-xl text-sm font-black transition-all active:scale-95 ${
+                                points > 0
+                                  ? 'bg-white/30 hover:bg-white/50 text-white shadow-md'
+                                  : 'bg-white/10 text-white/40 cursor-not-allowed'
+                              }`}
+                            >
+                              {points > 0 ? '+1 つかう' : 'ポイントなし'}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      {points > 0 && (
+                        <p className="text-center text-xs text-slate-500 font-bold mt-4">
+                          🌟 {points}ポイント持ってる！ゲームで有利になるステータスに振り分けよう！
+                        </p>
+                      )}
+                    </div>
+                  );
                 })()}
 
                 {/* 次のおすすめ教材（生徒・保護者共通） */}
@@ -1726,6 +1802,7 @@ const App = () => {
                     studentId={currentUser.studentId}
                     completedCount={completedCount}
                     totalMaterials={materials.length || 1}
+                    customStats={studentData?.customStats || { hp: 0, atk: 0, def: 0 }}
                   />
                 </div>
               );
