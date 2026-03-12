@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db, appId } from '../firebase';
 
-export const useFirebase = (currentUser) => {
+export default function useFirebase(currentUser) {
   const [data, setData] = useState({
     students: [],
     learningRecords: [],
@@ -19,8 +19,12 @@ export const useFirebase = (currentUser) => {
     reflectionTemplate: [],
     completionRequests: [],
     messages: [],
+    sb3Files: [],
+    storageUsage: 0,
     loading: true
   });
+
+  const [storageUsage, setStorageUsage] = useState(0);
 
   useEffect(() => {
     if (!currentUser) {
@@ -30,11 +34,20 @@ export const useFirebase = (currentUser) => {
 
     const unsubscribers = [];
     const isStudentOrParent = currentUser.role === 'student' || currentUser.role === 'parent';
+    const isStudent = currentUser.role === 'student';
     const studentIdCtx = isStudentOrParent 
       ? (currentUser.role === 'student' ? currentUser.studentId : currentUser.childId) 
       : null;
 
     // --- Subscriptions ---
+    
+    // 8. SB3 Files (Student specific)
+    if (isStudent) {
+      const unsub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'students', currentUser.studentId, 'sb3_files'), (snap) => {
+        setData(prev => ({ ...prev, sb3Files: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
+      });
+      unsubscribers.push(unsub);
+    }
 
     // 1. Students
     if (isStudentOrParent) {
@@ -115,5 +128,9 @@ export const useFirebase = (currentUser) => {
     };
   }, [currentUser]);
 
-  return data;
-};
+  return {
+    ...data,
+    storageUsage,
+    setStorageUsage
+  };
+}
