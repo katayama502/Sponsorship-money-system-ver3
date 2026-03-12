@@ -779,14 +779,8 @@ const App = () => {
       return;
     }
     
-    let previewUrl = m.url;
-    // Googleドライブのリンクの場合はプレビュー用のに変換
-    if (previewUrl.includes('drive.google.com/file/d/')) {
-       // /view... を削除して /preview に置換する
-       previewUrl = previewUrl.replace(/\/view.*$/, '/preview');
-    }
-    
-    setPreviewModal({ title: m.title, embedUrl: previewUrl, type: 'pdf' });
+    // PDF等は別タブで開く
+    window.open(m.url, '_blank', 'noopener,noreferrer');
   };
 
   const toggleMaterialComplete = async (e, materialId) => {
