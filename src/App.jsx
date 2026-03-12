@@ -596,11 +596,24 @@ const App = () => {
     setTimeout(() => setSaveMessage(''), 3000);
   };
 
+  // GoogleドライブのURLを /view から /preview に変換するヘルパー
+  const normalizeGDriveUrl = (url) => {
+    if (!url) return url;
+    // /view または /view?... を /preview に置換
+    return url.replace(/\/view(\?.*)?$/, '/preview');
+  };
+
   const saveMaterial = async (e) => {
     e.preventDefault();
     if (!window.confirm(editingMaterial ? 'このカリキュラム内容を更新しますか？' : 'この内容でカリキュラムを登録しますか？')) return;
     try {
-      const data = { ...materialForm, updatedAt: serverTimestamp() };
+      const data = {
+        ...materialForm,
+        url: normalizeGDriveUrl(materialForm.url),
+        thumbnailUrl: normalizeGDriveUrl(materialForm.thumbnailUrl),
+        downloadUrl: normalizeGDriveUrl(materialForm.downloadUrl),
+        updatedAt: serverTimestamp()
+      };
       if (editingMaterial) {
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', editingMaterial.id), data);
       } else {
