@@ -6,6 +6,7 @@ export default function GachaSystem({ points, onRoll }) {
   const [isRolling, setIsRolling] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [playingVideo, setPlayingVideo] = useState(null);
 
   const handleRoll = async () => {
     if (points < 10) {
@@ -18,13 +19,23 @@ export default function GachaSystem({ points, onRoll }) {
     setResult(null);
     setError('');
 
-    // Simulate animation delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
     const pulledItem = rollGacha();
     await onRoll(pulledItem); // Deduct points and save to inventory
     
-    setResult(pulledItem);
+    const videoMap = {
+      'C': '/video/1.mp4',
+      'B': '/video/2.mp4',
+      'A': '/video/3.mp4',
+      'S': '/video/4.mp4',
+      'SS': '/video/5.mp4',
+    };
+    
+    setPlayingVideo({ url: videoMap[pulledItem.rarity], item: pulledItem });
+  };
+
+  const handleVideoEnded = () => {
+    setResult(playingVideo.item);
+    setPlayingVideo(null);
     setIsRolling(false);
   };
 
@@ -87,10 +98,16 @@ export default function GachaSystem({ points, onRoll }) {
           {/* Decorative background stars */}
           <div className="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-700 via-slate-900 to-black"></div>
           
-          {isRolling ? (
-            <div className="relative z-10 flex flex-col items-center gap-4 animate-bounce">
-              <PackageOpen size={64} className="text-fuchsia-400" />
-              <p className="text-fuchsia-300 font-black tracking-widest animate-pulse">OPENING...</p>
+          {playingVideo ? (
+            <div className="relative z-10 w-full h-full flex flex-col items-center justify-center animate-in zoom-in duration-500">
+              <video 
+                src={playingVideo.url} 
+                className="w-full h-full object-cover rounded-2xl shadow-2xl"
+                autoPlay 
+                muted 
+                playsInline
+                onEnded={handleVideoEnded}
+              />
             </div>
           ) : result ? (
             <div className={`relative z-10 w-full animate-in zoom-in duration-500 delay-150`}>
