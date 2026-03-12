@@ -57,7 +57,7 @@ import {
 // Firebase imports
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot, query, serverTimestamp, addDoc, updateDoc, getDocs, getDoc, where, limit } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot, query, serverTimestamp, addDoc, updateDoc, getDocs, getDoc, where, limit, writeBatch } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll } from 'firebase/storage';
 import TypingGame from './components/TypingGame.jsx';
 import GachaSystem from './components/GachaSystem.jsx';
@@ -238,26 +238,51 @@ const App = () => {
   useEffect(() => {
     if (!currentUser) return;
 
-    // Firestoreの全データを同期
-    const unsubStudents = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'students'), (snap) => {
-      setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    const isStudentOrParent = currentUser.role === 'student' || currentUser.role === 'parent';
+    const studentIdCtx = isStudentOrParent ? (currentUser.role === 'student' ? currentUser.studentId : currentUser.childId) : null;
+
+    // Students
+    const unsubStudents = isStudentOrParent
+      ? onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'students', studentIdCtx), (docSnap) => {
+          if (docSnap.exists()) setStudents([{ id: docSnap.id, ...docSnap.data() }]);
+          else setStudents([]);
+        })
+      : onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'students'), (snap) => {
+          setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+
     const unsubAnnounce = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'announcements'), (snap) => {
       setAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()));
     });
-    const unsubLearning = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'learning_records'), limit(50)), (snap) => {
+
+    // Learning records
+    const learningQuery = isStudentOrParent
+      ? query(collection(db, 'artifacts', appId, 'public', 'data', 'learning_records'), where('studentId', '==', studentIdCtx), limit(50))
+      : query(collection(db, 'artifacts', appId, 'public', 'data', 'learning_records'), limit(50));
+    const unsubLearning = onSnapshot(learningQuery, (snap) => {
       setLearningRecords(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
+
     const unsubMaterials = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'materials'), (snap) => {
       setMaterials(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()));
     });
     const unsubReflections = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'reflection_template'), (snap) => {
       setReflectionTemplate(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)));
     });
-    const unsubCompletionRequests = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'completion_requests'), (snap) => {
+
+    // Completion Requests
+    const completionQuery = isStudentOrParent
+      ? query(collection(db, 'artifacts', appId, 'public', 'data', 'completion_requests'), where('studentId', '==', studentIdCtx))
+      : collection(db, 'artifacts', appId, 'public', 'data', 'completion_requests');
+    const unsubCompletionRequests = onSnapshot(completionQuery, (snap) => {
       setCompletionRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)));
     });
-    const unsubMessages = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), limit(50)), (snap) => {
+
+    // Messages
+    const msgsQuery = isStudentOrParent
+      ? query(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), where('studentId', '==', studentIdCtx), limit(50))
+      : query(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), limit(50));
+    const unsubMessages = onSnapshot(msgsQuery, (snap) => {
       setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)));
     });
 
@@ -457,7 +482,13 @@ const App = () => {
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'completion_requests', req.id));
       }
 
-      // 4. Finally delete the student record itself
+      // 4. Delete associated messages
+      const messagesToDelete = messages.filter(m => m.studentId === studentId);
+      for (const m of messagesToDelete) {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'messages', m.id));
+      }
+
+      // 5. Finally delete the student record itself
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', studentId));
       setSaveMessage('生徒データを一括削除しました');
     } catch (e) {
@@ -530,11 +561,15 @@ const App = () => {
         unreadMsgs = messages.filter(m => m.studentId === studentIdCtx && m.receiverId === studentIdCtx && !m.isRead);
       }
 
-      for (const msg of unreadMsgs) {
+      if (unreadMsgs.length > 0) {
+        const batch = writeBatch(db);
+        unreadMsgs.forEach(msg => {
+          batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'messages', msg.id), { isRead: true });
+        });
         try {
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'messages', msg.id), { isRead: true });
+          await batch.commit();
         } catch (e) {
-          console.error("Failed to mark read", e);
+          console.error("Failed to mark messages read", e);
         }
       }
     };
@@ -1622,14 +1657,22 @@ const App = () => {
                             <p className="text-sm text-slate-400 text-center py-8">ガチャを回して装備を手に入れよう！</p>
                           ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-2">
-                              {inventory.map((itemId, idx) => {
+                              {Object.values(inventory.reduce((acc, itemId) => {
+                                if (!acc[itemId]) acc[itemId] = { id: itemId, count: 0 };
+                                acc[itemId].count++;
+                                return acc;
+                              }, {})).map((group, idx) => {
+                                const itemId = group.id;
                                 const item = GACHA_ITEMS.find(i => i.id === itemId);
                                 if (!item) return null;
                                 const isEquipped = Object.values(equipped).includes(itemId);
                                 return (
                                   <div key={`${itemId}-${idx}`} className={`p-4 rounded-xl border flex items-center justify-between gap-4 ${isEquipped ? 'bg-slate-100 border-slate-200 opacity-60' : 'bg-white border-slate-200 shadow-sm hover:border-orange-200'}`}>
                                     <div>
-                                      <p className="font-black text-sm text-slate-800">{item.name} <span className="text-[9px] px-1.5 rounded bg-slate-100 border text-slate-500">{item.rarity}</span></p>
+                                      <p className="font-black text-sm text-slate-800">
+                                        {item.name} <span className="text-[9px] px-1.5 rounded bg-slate-100 border text-slate-500">{item.rarity}</span>
+                                        {group.count > 1 && <span className="ml-2 text-xs font-bold text-fuchsia-500">x{group.count}</span>}
+                                      </p>
                                       <div className="flex gap-2 text-[10px] font-bold text-slate-400 mt-1">
                                         <span>{item.type === 'weapon' ? '⚔️' : item.type === 'armor' ? '🛡️' : '💍'}</span>
                                         {item.stats.hp !== 0 && <span>HP{item.stats.hp>0?'+':''}{item.stats.hp}</span>}

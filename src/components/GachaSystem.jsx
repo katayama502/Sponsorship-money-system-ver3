@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PackageOpen, Sparkles, Coins } from 'lucide-react';
 import { rollGacha, RARITY_RATES } from '../data/items';
 
@@ -8,7 +8,20 @@ export default function GachaSystem({ points, onRoll }) {
   const [error, setError] = useState('');
   const [playingVideo, setPlayingVideo] = useState(null);
 
+  // Preload gacha videos
+  useEffect(() => {
+    const videos = ['/video/1.mp4', '/video/2.mp4', '/video/3.mp4', '/video/4.mp4', '/video/5.mp4'];
+    videos.forEach(src => {
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'video';
+      link.href = src;
+      document.head.appendChild(link);
+    });
+  }, []);
+
   const handleRoll = async () => {
+    if (isRolling) return;
     if (points < 10) {
       setError('ポイントが足りません！');
       setTimeout(() => setError(''), 3000);
