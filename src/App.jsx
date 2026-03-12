@@ -780,9 +780,10 @@ const App = () => {
     }
     
     let previewUrl = m.url;
-    // Googleドライブのリンクの場合はプレビュー用に変換
+    // Googleドライブのリンクの場合はプレビュー用のに変換
     if (previewUrl.includes('drive.google.com/file/d/')) {
-       previewUrl = previewUrl.replace(/\/view(\?.*)?$/, '/preview');
+       // /view... を削除して /preview に置換する
+       previewUrl = previewUrl.replace(/\/view.*$/, '/preview');
     }
     
     setPreviewModal({ title: m.title, embedUrl: previewUrl, type: 'pdf' });
