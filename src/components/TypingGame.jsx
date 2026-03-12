@@ -160,7 +160,35 @@ const STAGES = [
     bg: 'from-indigo-950 via-black to-black border border-indigo-500/30' },
 ];
 
-// --- Player stats mapping by level (1-5) ---
+// --- 20レベル XPシステム（App.jsxと同じロジック）
+const _XP_THRESHOLDS = [50,100,160,240,340,460,600,760,940,1080,900,1100,1320,1560,1830,2120,2440,2790,3200];
+const _XP_CUMULATIVE = _XP_THRESHOLDS.reduce((acc, v, i) => { acc.push((acc[i-1]||0)+v); return acc; }, []);
+const _getLevelFromXp = (xp = 0) => {
+  for (let i = 0; i < _XP_CUMULATIVE.length; i++) { if (xp < _XP_CUMULATIVE[i]) return i + 1; }
+  return 20;
+};
+const getLevelCharacter = (xp = 0) => {
+  const level = _getLevelFromXp(xp);
+  if (level >= 20) return { imageUrl: '/characters/lv5.png', name: 'プログラミングマスター' };
+  if (level >= 15) return { imageUrl: '/characters/lv4.png', name: 'つよつよプログラマー' };
+  if (level >= 10) return { imageUrl: '/characters/lv3.png', name: 'ゆうかんなチャレンジャー' };
+  if (level >= 5)  return { imageUrl: '/characters/lv2.png', name: 'げんきなチャレンジャー' };
+  return { imageUrl: '/characters/lv1.png', name: 'はじまりのルーキー' };
+};
+
+// ゲーム内プレイヤーレベル（1–5にマッピング）
+const getPlayerLevel = (xp = 0) => {
+  const level = _getLevelFromXp(xp);
+  if (level >= 15) return 5;
+  if (level >= 10) return 4;
+  if (level >= 5)  return 3;
+  if (level >= 3)  return 2;
+  return 1;
+};
+
+const ENEMY_ATTACK_INTERVAL_MS = 3500; // Enemy attacks every 3.5 seconds
+
+// --- Player stats mapping by game level (1-5 mapped from XP level) ---
 const PLAYER_STATS = {
   1: { maxHp: 80,  atk: 8  },
   2: { maxHp: 120, atk: 14 },
@@ -169,28 +197,9 @@ const PLAYER_STATS = {
   5: { maxHp: 350, atk: 50 },
 };
 
-const getPlayerLevel = (percentage) => {
-  if (percentage >= 100) return 5;
-  if (percentage >= 75)  return 4;
-  if (percentage >= 50)  return 3;
-  if (percentage >= 25)  return 2;
-  return 1;
-};
-
-const getLevelCharacter = (percentage) => {
-  if (percentage >= 100) return { imageUrl: '/characters/lv5.png', name: 'プログラミングマスター' };
-  if (percentage >= 75)  return { imageUrl: '/characters/lv4.png', name: 'つよつよプログラマー' };
-  if (percentage >= 50)  return { imageUrl: '/characters/lv3.png', name: 'ゆうかんなチャレンジャー' };
-  if (percentage >= 25)  return { imageUrl: '/characters/lv2.png', name: 'げんきなチャレンジャー' };
-  return { imageUrl: '/characters/lv1.png', name: 'はじまりのルーキー' };
-};
-
-const ENEMY_ATTACK_INTERVAL_MS = 3500; // Enemy attacks every 3.5 seconds
-
-const TypingGame = ({ studentId, completedCount, totalMaterials, customStats = { hp: 0, atk: 0, def: 0 }, equipped = { weapon: null, armor: null, accessory: null } }) => {
-  const progressPercentage = totalMaterials > 0 ? Math.min(100, Math.floor((completedCount / totalMaterials) * 100)) : 0;
-  const playerLevel = getPlayerLevel(progressPercentage);
-  const charInfo = getLevelCharacter(progressPercentage);
+const TypingGame = ({ studentId, studentXp = 0, completedCount, totalMaterials, customStats = { hp: 0, atk: 0, def: 0 }, equipped = { weapon: null, armor: null, accessory: null }, onGameClear }) => {
+  const playerLevel = getPlayerLevel(studentXp);
+  const charInfo = getLevelCharacter(studentXp);
   const base = PLAYER_STATS[playerLevel];
 
   const totalCustomStats = React.useMemo(() => {
@@ -261,9 +270,12 @@ const TypingGame = ({ studentId, completedCount, totalMaterials, customStats = {
     try {
       const snap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', studentId));
       const existing = snap.data()?.clearedStages || [];
+      const isNewClear = !existing.includes(stageId);
       const updated = Array.from(new Set([...existing, stageId]));
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', studentId), { clearedStages: updated });
       setClearedStages(updated);
+      // 新規クリアのみXP付与
+      if (isNewClear && onGameClear) await onGameClear();
     } catch (e) { console.error(e); }
   };
 
@@ -376,7 +388,7 @@ const TypingGame = ({ studentId, completedCount, totalMaterials, customStats = {
             <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1">あなたのキャラクター</p>
             <h3 className="text-xl font-black">{charInfo.name}</h3>
             <p className="text-sm text-slate-300 mt-1 font-medium">
-              Lv.{playerLevel} カリキュラム{progressPercentage}%
+              Lv.{_getLevelFromXp(studentXp)} | HP:{maxHp}{totalCustomStats.hp > 0 ? ` (+${totalCustomStats.hp})` : ''}
             </p>
             <div className="flex gap-4 mt-2 text-xs font-black">
               <span className="text-rose-300">❤️ HP:{maxHp}{totalCustomStats.hp > 0 ? ` (+${totalCustomStats.hp})` : ''}</span>
@@ -435,7 +447,7 @@ const TypingGame = ({ studentId, completedCount, totalMaterials, customStats = {
         {playerLevel < 5 && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
             <p className="text-sm font-bold text-amber-700">
-              🎯 カリキュラムをもっとこなしてレベルアップすれば、強い敵に挑戦できるよ！
+              🎯 XPを貯めてレベルアップすれば、強い敵に挑戦できるよ！（振り返り・カリキュラム・ゲームクリアでXPGET）
             </p>
           </div>
         )}
@@ -470,7 +482,7 @@ const TypingGame = ({ studentId, completedCount, totalMaterials, customStats = {
               <div className="w-16 h-16 mx-auto mb-2 flex items-center justify-center">
                 <img src={charInfo.imageUrl} alt={charInfo.name} className="w-full h-full object-contain drop-shadow-lg" onError={e => { e.target.style.display='none'; }} />
               </div>
-              <p className="text-xs font-black text-white mb-2">Lv.{playerLevel} | HP {playerHp}/{maxHp}</p>
+              <p className="text-xs font-black text-white mb-2">Lv.{_getLevelFromXp(studentXp)} | HP {playerHp}/{maxHp}</p>
               <HpBar current={playerHp} max={maxHp} color="bg-sky-400" />
             </div>
 
@@ -558,7 +570,7 @@ const TypingGame = ({ studentId, completedCount, totalMaterials, customStats = {
           )}
           {!nextStage && (
             <p className="bg-amber-100 text-amber-700 font-bold px-5 py-3 rounded-2xl">
-              👑 全ステージクリア！最強だ！！
+              👑 全ステージクリア！最強だ！！+20XP獲得！
             </p>
           )}
         </div>
@@ -577,7 +589,7 @@ const TypingGame = ({ studentId, completedCount, totalMaterials, customStats = {
         <p className="text-slate-600 font-bold">「{selectedStage.name}」にたおされた！</p>
         {playerLevel < 5 && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm font-bold text-amber-700">
-            💡 カリキュラムをこなしてレベルアップすれば、もっと強くなれるよ！
+            💡 XPを貯めてレベルアップすれば、もっと強くなれるよ！
           </div>
         )}
         <div className="flex justify-center gap-4 mt-6">

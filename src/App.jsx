@@ -92,12 +92,49 @@ const MATERIAL_CATEGORIES = [
   { id: 'robot', label: 'Robot' }
 ];
 
-const getLevelCharacter = (percentage) => {
-  if (percentage >= 100) return { imageUrl: "/characters/lv5.png", name: "プログラミングマスター", color: "text-amber-500", bg: "bg-amber-100", border: "border-amber-400" };
-  if (percentage >= 75) return { imageUrl: "/characters/lv4.png", name: "つよつよプログラマー", color: "text-purple-600", bg: "bg-purple-100", border: "border-purple-400" };
-  if (percentage >= 50) return { imageUrl: "/characters/lv3.png", name: "ゆうかんなチャレンジャー", color: "text-orange-600", bg: "bg-orange-100", border: "border-orange-400" };
-  if (percentage >= 25) return { imageUrl: "/characters/lv2.png", name: "げんきなチャレンジャー", color: "text-sky-500", bg: "bg-sky-100", border: "border-sky-400" };
-  return { imageUrl: "/characters/lv1.png", name: "はじまりのルーキー", color: "text-slate-500", bg: "bg-slate-100", border: "border-slate-300" };
+// --- 20レベル XPシステム ---
+// 各レベルアップに必要なXP（index 0 = Lv1→Lv2, index 18 = Lv19→Lv20）
+const XP_THRESHOLDS = [50,100,160,240,340,460,600,760,940,1080,900,1100,1320,1560,1830,2120,2440,2790,3200];
+// ここまでの累計XP（Lv Nに到達するために必要な合計XP）
+const XP_CUMULATIVE = XP_THRESHOLDS.reduce((acc, v, i) => { acc.push((acc[i-1]||0)+v); return acc; }, []);
+
+const getLevelFromXp = (xp = 0) => {
+  for (let i = 0; i < XP_CUMULATIVE.length; i++) {
+    if (xp < XP_CUMULATIVE[i]) return i + 1; // levels 1-19
+  }
+  return 20; // max
+};
+
+const getXpInfo = (xp = 0) => {
+  const level = getLevelFromXp(xp);
+  if (level >= 20) {
+    return { level: 20, xpInLevel: XP_THRESHOLDS[18], xpToNext: 0, progressPct: 100 };
+  }
+  const prevCum = level >= 2 ? XP_CUMULATIVE[level - 2] : 0;
+  const xpInLevel = xp - prevCum;
+  const xpToNext = XP_THRESHOLDS[level - 1];
+  return { level, xpInLevel, xpToNext, progressPct: Math.floor((xpInLevel / xpToNext) * 100) };
+};
+
+// レベルから進化ステージ（1〜5）と キャラ情報を返す
+const getLevelCharacter = (xp = 0) => {
+  const { level } = getXpInfo(xp);
+  if (level >= 20) return { imageUrl: "/characters/lv5.png", name: "プログラミングマスター", color: "text-amber-500", bg: "bg-amber-100", border: "border-amber-400", evolution: 5 };
+  if (level >= 15) return { imageUrl: "/characters/lv4.png", name: "つよつよプログラマー", color: "text-purple-600", bg: "bg-purple-100", border: "border-purple-400", evolution: 4 };
+  if (level >= 10) return { imageUrl: "/characters/lv3.png", name: "ゆうかんなチャレンジャー", color: "text-orange-600", bg: "bg-orange-100", border: "border-orange-400", evolution: 3 };
+  if (level >= 5)  return { imageUrl: "/characters/lv2.png", name: "げんきなチャレンジャー", color: "text-sky-500", bg: "bg-sky-100", border: "border-sky-400", evolution: 2 };
+  return { imageUrl: "/characters/lv1.png", name: "はじまりのルーキー", color: "text-slate-500", bg: "bg-slate-100", border: "border-slate-300", evolution: 1 };
+};
+
+// ゲーム内プレイヤーLv（XPベース、1〜5にマッピング）
+const getGamePlayerLevel = (xp = 0) => {
+  const { level } = getXpInfo(xp);
+  if (level >= 20) return 5;
+  if (level >= 15) return 5;
+  if (level >= 10) return 4;
+  if (level >= 5)  return 3;
+  if (level >= 3)  return 2;
+  return 1;
 };
 
 const getMaterialThumbnail = (category) => {
@@ -723,24 +760,25 @@ const App = () => {
   };
 
   const submitAdminComment = async (recordId) => {
-    if (!window.confirm('このコメントを送信しますか？（★初めてのコメントの場合、生徒に1ポイント付与されます）')) return;
+    if (!window.confirm('このコメントを送信しますか？（★初めてのコメントの場合、生徒に1ポイント・30XP付与されます）')) return;
     const record = learningRecords.find(r => r.id === recordId);
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'learning_records', recordId), {
         comment: adminComment[recordId], commentedAt: serverTimestamp(),
         commentPointed: true,
       });
-      // ポイント付与（初回コメント時のみ）
+      // ポイント & XP付与（初回コメント時のみ）
       if (record?.studentId && !record.commentPointed) {
         const studentRef = doc(db, 'artifacts', appId, 'public', 'data', 'students', record.studentId);
         const studentSnap = await getDoc(studentRef);
         const currentPoints = studentSnap.exists() ? (studentSnap.data().points || 0) : 0;
-        await updateDoc(studentRef, { points: currentPoints + 1 });
+        const currentXp = studentSnap.exists() ? (studentSnap.data().xp || 0) : 0;
+        await updateDoc(studentRef, { points: currentPoints + 1, xp: currentXp + 30 });
       }
       // 生徒にコメント通知メッセージを自動送信
       if (record?.studentId) {
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), {
-          text: `📝 「${record.title}」に先生からコメントが届きました。${!record.commentPointed ? '🌟+1ポイントGET！マイページでステータスを強化しよう！' : 'マイページで確認してね！'}`,
+          text: `📝 「${record.title}」に先生からコメントが届きました。${!record.commentPointed ? '🌟+1ポイント・+30XP GET！マイページでレベルアップを確認しよう！' : 'マイページで確認してね！'}`,
           senderId: 'admin',
           senderRole: 'admin',
           senderName: '講師・サポーター (自動通知)',
@@ -830,17 +868,27 @@ const App = () => {
         approvedAt: serverTimestamp()
       });
 
-      // 2. Update the student's completed materials
+      // 2. Update completed materials & add XP
+      const studentRef = doc(db, 'artifacts', appId, 'public', 'data', 'students', studentId);
       const studentData = students.find(s => s.id === studentId);
       if (studentData) {
         const currentCompleted = studentData.completedMaterials || [];
         if (!currentCompleted.includes(materialId)) {
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', studentId), {
-            completedMaterials: [...currentCompleted, materialId]
+          const snap = await getDoc(studentRef);
+          const currentXp = snap.exists() ? (snap.data().xp || 0) : 0;
+          await updateDoc(studentRef, {
+            completedMaterials: [...currentCompleted, materialId],
+            xp: currentXp + 50
+          });
+          // XP獲得通知
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), {
+            text: `🎉 カリキュラム完了が承認されました！+50XP獲得！マイページでレベルを確認しよう！`,
+            senderId: 'admin', senderRole: 'admin', senderName: '講師・サポーター (自動通知)',
+            receiverId: studentId, studentId, isRead: false, createdAt: serverTimestamp(),
           });
         }
       }
-      setSaveMessage('完了を承認しました');
+      setSaveMessage('完了を承認しました（+50XP付与）');
       setTimeout(() => setSaveMessage(''), 3000);
     } catch (err) {
       console.error(err);
@@ -1639,13 +1687,15 @@ const App = () => {
                   </div>
                 </header>
 
-                {/* --- 新機能: キャラクターと進捗バー --- */}
+                {/* --- キャラクターとXPステータスバー --- */}
                 {(() => {
                   const loggedInStudent = currentUser.role === 'student' ? students.find(s => s.id === currentUser.studentId) : students.find(s => s.id === currentUser.childId);
-                  const completedCount = loggedInStudent?.completedMaterials?.length || 0;
-                  const totalMaterials = materials.length > 0 ? materials.length : 1;
-                  const progressPercentage = Math.min(100, Math.floor((completedCount / totalMaterials) * 100));
-                  const charInfo = getLevelCharacter(progressPercentage);
+                  const studentXp = loggedInStudent?.xp || 0;
+                  const charInfo = getLevelCharacter(studentXp);
+                  const { level, xpInLevel, xpToNext, progressPct } = getXpInfo(studentXp);
+                  const isMaxLevel = level >= 20;
+                  // 次の進化レベル
+                  const nextEvolution = level < 5 ? 5 : level < 10 ? 10 : level < 15 ? 15 : level < 20 ? 20 : null;
 
                   return (
                     <div className={`rounded-[2rem] border shadow-lg overflow-hidden flex flex-col md:flex-row items-center p-8 gap-8 transition-all ${charInfo.bg} ${charInfo.border}`}>
@@ -1660,27 +1710,47 @@ const App = () => {
                       <div className="flex-1 w-full space-y-4 text-center md:text-left">
                         <div>
                           <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-1">現在のクラス</p>
-                          <h3 className={`text-2xl font-black flex items-center justify-center md:justify-start gap-2 ${charInfo.color}`}>
-                            {progressPercentage >= 100 ? <Crown size={24} className="text-amber-500"/> : <Sparkles size={20}/>}
-                            {charInfo.name}
-                          </h3>
+                          <div className="flex items-center justify-center md:justify-start gap-3">
+                            <span className={`text-3xl font-black tabular-nums px-3 py-1 rounded-xl shadow-sm bg-white/60 ${charInfo.color}`}>Lv.{level}</span>
+                            <h3 className={`text-2xl font-black flex items-center gap-2 ${charInfo.color}`}>
+                              {isMaxLevel ? <Crown size={24} className="text-amber-500"/> : <Sparkles size={20}/>}
+                              {charInfo.name}
+                            </h3>
+                          </div>
                         </div>
+                        {/* XP バー */}
                         <div className="space-y-2">
                           <div className="flex justify-between items-center text-xs font-bold text-slate-600">
-                            <span>カリキュラム進捗</span>
-                            <span>{completedCount} / {materials.length} 完了 ({progressPercentage}%)</span>
+                            <span>⚡ 経験値 (XP)</span>
+                            {isMaxLevel
+                              ? <span className="text-amber-600 font-black">🏆 最大レベル達成！</span>
+                              : <span>{xpInLevel} / {xpToNext} XP</span>
+                            }
                           </div>
-                          <div className="w-full bg-white/50 rounded-full h-4 border border-white/40 overflow-hidden shadow-inner">
+                          <div className="w-full bg-white/50 rounded-full h-5 border border-white/40 overflow-hidden shadow-inner">
                             <div 
-                              className="h-full rounded-full transition-all duration-1000 ease-out bg-gradient-to-r from-orange-400 to-orange-500 relative"
-                              style={{ width: `${progressPercentage}%` }}
+                              className="h-full rounded-full transition-all duration-1000 ease-out bg-gradient-to-r from-violet-400 to-indigo-500 relative"
+                              style={{ width: `${isMaxLevel ? 100 : progressPct}%` }}
                             >
                               <div className="absolute top-0 right-0 bottom-0 left-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.2)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.2)_50%,rgba(255,255,255,0.2)_75%,transparent_75%,transparent)] bg-[length:1rem_1rem] opacity-50"></div>
                             </div>
                           </div>
-                          <p className={`text-[10px] font-black tracking-wider text-right ${progressPercentage >= 100 ? 'text-amber-600' : 'text-slate-400'}`}>
-                            {progressPercentage >= 100 ? 'コンプリート！すごい！' : 'カリキュラムを完了してレベルアップしよう！'}
+                          <div className="flex justify-between text-[10px] font-black text-slate-400">
+                            <span>Lv.{level}</span>
+                            {!isMaxLevel && <span>Lv.{level+1}</span>}
+                          </div>
+                        </div>
+                        {/* 進化ヒント */}
+                        {!isMaxLevel && nextEvolution && (
+                          <p className="text-[11px] font-bold text-slate-500 bg-white/40 rounded-xl px-3 py-2">
+                            ✨ Lv.{nextEvolution}で進化！あと <span className="font-black text-indigo-600">{(XP_CUMULATIVE[nextEvolution-2] - studentXp).toLocaleString()} XP</span> 必要
                           </p>
+                        )}
+                        {/* XP獲得方法ヒント */}
+                        <div className="flex flex-wrap gap-2 text-[10px]">
+                          <span className="bg-white/50 px-2 py-1 rounded-lg font-bold text-slate-500">📝 振り返り承認 +30XP</span>
+                          <span className="bg-white/50 px-2 py-1 rounded-lg font-bold text-slate-500">🎯 カリキュラム完了 +50XP</span>
+                          <span className="bg-white/50 px-2 py-1 rounded-lg font-bold text-slate-500">🎮 ゲームクリア +20XP</span>
                         </div>
                       </div>
                     </div>
@@ -2042,18 +2112,28 @@ const App = () => {
             {currentUser.role === 'student' && activeTab === 'game' && (() => {
               const studentData = students.find(s => s.id === currentUser.studentId);
               const completedCount = studentData?.completedMaterials?.length || 0;
+              const studentXp = studentData?.xp || 0;
               return (
                 <div className="space-y-6 animate-in fade-in duration-500">
                   <header>
                     <h2 className="text-2xl font-black text-slate-800 tracking-tight">🎮 タイピングバトル</h2>
-                    <p className="text-sm text-slate-500 font-medium mt-1">カリキュラムをこなしてキャラクターを強くしよう！</p>
+                    <p className="text-sm text-slate-500 font-medium mt-1">XPを貯めてキャラクターをレベルアップさせよう！</p>
                   </header>
                   <TypingGame
                     studentId={currentUser.studentId}
+                    studentXp={studentXp}
                     completedCount={completedCount}
                     totalMaterials={materials.length || 1}
                     customStats={studentData?.customStats || { hp: 0, atk: 0, def: 0 }}
                     equipped={studentData?.equipped || { weapon: null, armor: null, accessory: null }}
+                    onGameClear={async () => {
+                      try {
+                        const studentRef = doc(db, 'artifacts', appId, 'public', 'data', 'students', currentUser.studentId);
+                        const snap = await getDoc(studentRef);
+                        const currentXp = snap.exists() ? (snap.data().xp || 0) : 0;
+                        await updateDoc(studentRef, { xp: currentXp + 20 });
+                      } catch (e) { console.error('XP update failed', e); }
+                    }}
                   />
                 </div>
               );
