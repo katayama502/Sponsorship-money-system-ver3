@@ -398,6 +398,28 @@ const App = () => {
     setTimeout(() => setSaveMessage(''), 5000);
   };
 
+  const createTestAccount = async () => {
+    if (!window.confirm('ガチャテスト用の生徒アカウント（ID/PW: test, 10000pt）を作成しますか？')) return;
+    try {
+      const testData = {
+        name: 'ガチャ・テスト用', school: 'テスト校', age: '10', remarks: 'テストプレイ用アカウントです',
+        nextClassDate: new Date().toISOString().slice(0, 10),
+        studentLoginId: 'test', studentPassword: 'test',
+        parentLoginId: 'test_p', parentPassword: 'test_p',
+        inventory: [], equipped: { weapon: null, armor: null, accessory: null },
+        points: 10000,
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+      };
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'students'), testData);
+      setGeneratedCreds({ student: { id: 'test', pw: 'test' }, parent: { id: 'test_p', pw: 'test_p' }, name: 'ガチャ・テスト用' });
+      setSaveMessage('テストアカウントを作成しました');
+    } catch (e) {
+      console.error(e);
+      setSaveMessage('エラーが発生しました');
+    }
+    setTimeout(() => setSaveMessage(''), 5000);
+  };
+
   const deleteSponsor = async (id) => {
     if (!window.confirm('この企業を削除しますか？')) return;
     try {
@@ -903,7 +925,10 @@ const App = () => {
               {/* 生徒管理 */}
               {currentUser.role === 'admin' && activeTab === 'students' && !activeStudentDetail && (
                 <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500 text-left">
-                  <header className="text-left"><h2 className="text-2xl font-black tracking-tight text-left">受講生・保護者管理</h2></header>
+                  <header className="text-left flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <h2 className="text-2xl font-black tracking-tight text-left">受講生・保護者管理</h2>
+                    <button onClick={createTestAccount} className="bg-amber-100 hover:bg-amber-200 text-amber-600 px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 border border-amber-300 shadow-sm transition-all"><Sparkles size={14}/> ガチャテスト用アカウント作成 (10000pt)</button>
+                  </header>
                   {generatedCreds && (
                     <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-2xl space-y-4 border-2 border-orange-500 animate-in zoom-in-95 duration-300 text-left">
                       <div className="flex items-center gap-3 text-orange-400 font-bold text-left"><Key size={20} /> <span className="text-left">アカウントを発行しました: {generatedCreds.name}様</span></div>

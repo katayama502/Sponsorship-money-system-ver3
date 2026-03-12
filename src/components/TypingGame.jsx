@@ -67,6 +67,55 @@ const WORD_LIST = [
   { kana: 'カメラ', romaji: 'kamera' }, { kana: 'けいたいでんわ', romaji: 'keitaidenwa' },
 ];
 
+// --- Sound Effects using Web Audio API ---
+const audioCtx = typeof window !== 'undefined' ? new (window.AudioContext || window.webkitAudioContext)() : null;
+
+const playSound = (type) => {
+  if (!audioCtx) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  
+  const osc = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+  
+  osc.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  
+  const now = audioCtx.currentTime;
+  
+  if (type === 'hit') {
+    // Enemy hit (Player attacks) - High pitched short beep
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(800, now);
+    osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+    gainNode.gain.setValueAtTime(0.1, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  } else if (type === 'damage') {
+    // Player damaged - Low pitched noise/thud
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, now);
+    osc.frequency.exponentialRampToValueAtTime(40, now + 0.2);
+    gainNode.gain.setValueAtTime(0.2, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    osc.start(now);
+    osc.stop(now + 0.2);
+  } else if (type === 'win') {
+    // Win fanfare - Triumphant arpeggio
+    osc.type = 'triangle';
+    gainNode.gain.setValueAtTime(0.1, now);
+    
+    osc.frequency.setValueAtTime(440, now); // A4
+    osc.frequency.setValueAtTime(554.37, now + 0.1); // C#5
+    osc.frequency.setValueAtTime(659.25, now + 0.2); // E5
+    osc.frequency.setValueAtTime(880, now + 0.3); // A5
+    
+    gainNode.gain.linearRampToValueAtTime(0, now + 0.6);
+    osc.start(now);
+    osc.stop(now + 0.6);
+  }
+};
+
 // --- Stage definitions ---
 const STAGES = [
   { id: 1, name: 'スライム',     emoji: '🟢', hp: 30,  atk: 3,  minLv: 1, desc: 'よわよわのスライム。ウォームアップにどうぞ！',
@@ -89,6 +138,26 @@ const STAGES = [
     bg: 'from-red-950 via-rose-900 to-orange-950' },
   { id: 10, name: 'ラスボス',   emoji: '👑', hp: 900, atk: 90, minLv: 5, desc: '伝説の魔王！最強のキャラクターで挑め！',
     bg: 'from-yellow-900 via-amber-950 to-stone-950' },
+  { id: 11, name: 'キメラ',       emoji: '🦁', hp: 1200, atk: 110, minLv: 5, desc: 'ガチャで装備を整えないと苦戦するぞ！',
+    bg: 'from-fuchsia-900 via-purple-950 to-black' },
+  { id: 12, name: 'ゴーレム',     emoji: '🗿', hp: 1600, atk: 130, minLv: 5, desc: '岩のように硬い！HPが多いぞ！',
+    bg: 'from-stone-700 via-stone-800 to-stone-950' },
+  { id: 13, name: 'ヴァンパイア', emoji: '🧛', hp: 2000, atk: 150, minLv: 5, desc: '夜の支配者！強力な防具が必要だ！',
+    bg: 'from-red-900 via-rose-950 to-black' },
+  { id: 14, name: 'デスナイト',   emoji: '⚔️', hp: 2400, atk: 170, minLv: 5, desc: '死すら超えた騎士！Sレア以上推奨！',
+    bg: 'from-slate-800 via-slate-900 to-black' },
+  { id: 15, name: 'ベヒモス',     emoji: '🦏', hp: 2800, atk: 200, minLv: 5, desc: '大地を揺るがす巨獣！',
+    bg: 'from-orange-900 via-amber-900 to-black' },
+  { id: 16, name: 'リヴァイアサン', emoji: '🌊', hp: 3200, atk: 220, minLv: 5, desc: '海の神獣！凄まじい攻撃力！',
+    bg: 'from-blue-900 via-cyan-950 to-black' },
+  { id: 17, name: '古の邪竜',     emoji: '🐲', hp: 3800, atk: 250, minLv: 5, desc: '封印されし竜が目覚めた！',
+    bg: 'from-emerald-950 via-teal-950 to-black' },
+  { id: 18, name: '冥王',         emoji: '☠️', hp: 4500, atk: 280, minLv: 5, desc: '冥界を統べる者！SSレア級の力が必要！',
+    bg: 'from-purple-950 via-fuchsia-950 to-black' },
+  { id: 19, name: '破壊神',       emoji: '💥', hp: 5500, atk: 320, minLv: 5, desc: '全てを無に帰す存在！超難関！',
+    bg: 'from-rose-950 via-red-950 to-black' },
+  { id: 20, name: '宇宙の真理',   emoji: '🌌', hp: 7000, atk: 400, minLv: 5, desc: '究極の試練！完全装備で挑め！',
+    bg: 'from-indigo-950 via-black to-black border border-indigo-500/30' },
 ];
 
 // --- Player stats mapping by level (1-5) ---
@@ -224,6 +293,7 @@ const TypingGame = ({ studentId, completedCount, totalMaterials, customStats = {
           return 0;
         }
         setShakePlayer(true);
+        playSound('damage');
         setTimeout(() => setShakePlayer(false), 400);
         addLog(`💥 ${selectedStage.name}の攻撃！ -${dmg}ダメージ${playerDef > 0 ? ` (防御${playerDef}軽減)` : ''}`, 'enemy');
         return next;
@@ -263,6 +333,7 @@ const TypingGame = ({ studentId, completedCount, totalMaterials, customStats = {
         if (next <= 0) {
           clearInterval(enemyTimerRef.current);
           setTimeout(async () => {
+            playSound('win');
             await saveClearedStage(selectedStage.id);
             setScreen('win');
           }, 400);
@@ -271,6 +342,7 @@ const TypingGame = ({ studentId, completedCount, totalMaterials, customStats = {
         return next;
       });
       setShakeEnemy(true);
+      playSound('hit');
       setTimeout(() => setShakeEnemy(false), 400);
       addLog(`⚡ 「${currentWord.kana}」せいかい！ -${dmg}ダメージ！`, 'player');
       pickNewWord();
@@ -393,7 +465,7 @@ const TypingGame = ({ studentId, completedCount, totalMaterials, customStats = {
           {/* Combatant panels */}
           <div className="relative grid grid-cols-2 gap-3">
             {/* Player side */}
-            <div className={`bg-white/10 backdrop-blur-sm rounded-2xl border border-white/30 p-4 text-center transition-transform duration-100 ${shakePlayer ? 'translate-x-2' : ''}`}>
+            <div className={`bg-white/10 backdrop-blur-sm rounded-2xl border border-white/30 p-4 text-center ${shakePlayer ? 'animate-shake' : ''}`}>
               <p className="text-[10px] font-black uppercase tracking-widest text-white/70 mb-1">あなた</p>
               <div className="w-16 h-16 mx-auto mb-2 flex items-center justify-center">
                 <img src={charInfo.imageUrl} alt={charInfo.name} className="w-full h-full object-contain drop-shadow-lg" onError={e => { e.target.style.display='none'; }} />
@@ -403,7 +475,7 @@ const TypingGame = ({ studentId, completedCount, totalMaterials, customStats = {
             </div>
 
             {/* Enemy side */}
-            <div className={`bg-black/20 backdrop-blur-sm rounded-2xl border border-white/20 p-4 text-center transition-transform duration-100 ${shakeEnemy ? '-translate-x-2' : ''}`}>
+            <div className={`bg-black/20 backdrop-blur-sm rounded-2xl border border-white/20 p-4 text-center ${shakeEnemy ? 'animate-shake' : ''}`}>
               <p className="text-[10px] font-black uppercase tracking-widest text-white/70 mb-1">てき</p>
               <div className="w-16 h-16 mx-auto mb-2 flex items-center justify-center text-5xl filter drop-shadow-lg">
                 {selectedStage.emoji}
