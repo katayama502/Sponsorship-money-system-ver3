@@ -128,6 +128,32 @@ const App = () => {
     setStorageUsage
   } = useFirebase(currentUser, appId);
 
+
+  // --- Form States ---
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [activeStudentDetail, setActiveStudentDetail] = useState(null);
+  const [studentForm, setStudentForm] = useState({
+    name: '', school: '', age: '', remarks: '', nextClassDate: '',
+    studentLoginId: '', studentPassword: '', parentLoginId: '', parentPassword: '',
+    inventory: [], equipped: { weapon: null, armor: null, accessory: null }
+  });
+  const [generatedCreds, setGeneratedCreds] = useState(null);
+  const [newLearningRecord, setNewLearningRecord] = useState({ title: '', content: {}, imageUrl: '', fileUrl: '', linkUrl: '', lessonDate: new Date().toISOString().slice(0, 10) });
+  const [adminComment, setAdminComment] = useState({});
+  const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', type: 'info' });
+  const [reflectionItemForm, setReflectionItemForm] = useState({ title: '', type: 'textarea', category: 'goal' });
+  const [editingReflectionItem, setEditingReflectionItem] = useState(null);
+  const [parentComment, setParentComment] = useState({});
+  const [materialForm, setMaterialForm] = useState({ title: '', url: '', category: 'scratch', thumbnailUrl: '', isPublished: true });
+  const [editingMaterial, setEditingMaterial] = useState(null);
+  const [newMessage, setNewMessage] = useState('');
+  
+  const [isUploadingSb3, setIsUploadingSb3] = useState(false);
+  const [isUploadingMaterialUpload, setIsUploadingMaterialUpload] = useState(false);
+  const [isUploadingMaterialThumbnail, setIsUploadingMaterialThumbnail] = useState(false);
+
+  const sb3InputRef = useRef(null);
+
   // --- Admin Actions Hook ---
   const adminActions = useAdminActions({
     appId,
@@ -154,30 +180,6 @@ const App = () => {
     setIsUploadingMaterialThumbnail
   });
 
-  // --- Form States ---
-  const [editingStudent, setEditingStudent] = useState(null);
-  const [activeStudentDetail, setActiveStudentDetail] = useState(null);
-  const [studentForm, setStudentForm] = useState({
-    name: '', school: '', age: '', remarks: '', nextClassDate: '',
-    studentLoginId: '', studentPassword: '', parentLoginId: '', parentPassword: '',
-    inventory: [], equipped: { weapon: null, armor: null, accessory: null }
-  });
-  const [generatedCreds, setGeneratedCreds] = useState(null);
-  const [newLearningRecord, setNewLearningRecord] = useState({ title: '', content: {}, imageUrl: '', fileUrl: '', linkUrl: '', lessonDate: new Date().toISOString().slice(0, 10) });
-  const [adminComment, setAdminComment] = useState({});
-  const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', type: 'info' });
-  const [reflectionItemForm, setReflectionItemForm] = useState({ title: '', type: 'textarea', category: 'goal' });
-  const [editingReflectionItem, setEditingReflectionItem] = useState(null);
-  const [parentComment, setParentComment] = useState({});
-  const [materialForm, setMaterialForm] = useState({ title: '', url: '', category: 'scratch', thumbnailUrl: '', isPublished: true });
-  const [editingMaterial, setEditingMaterial] = useState(null);
-  const [newMessage, setNewMessage] = useState('');
-  
-  const [isUploadingSb3, setIsUploadingSb3] = useState(false);
-  const [isUploadingMaterialUpload, setIsUploadingMaterialUpload] = useState(false);
-  const [isUploadingMaterialThumbnail, setIsUploadingMaterialThumbnail] = useState(false);
-
-  const sb3InputRef = useRef(null);
 
   // --- Search ---
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
