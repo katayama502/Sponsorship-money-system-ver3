@@ -104,8 +104,8 @@ export default function AdminLayout({
           <button onClick={() => { setActiveTab('students'); setActiveStudentDetail(null); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'students' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
             <span className="flex items-center gap-3"><Users size={18} /> 受講生一覧</span>
             {(() => {
-              const unreadCount = students.filter(s => {
-                const studentMsgs = messages.filter(m => m.studentId === s.id);
+              const unreadCount = (students || []).filter(s => {
+                const studentMsgs = (messages || []).filter(m => m.studentId === s.id);
                 if (studentMsgs.length === 0) return false;
                 return studentMsgs[studentMsgs.length - 1].senderId !== 'admin';
               }).length;
@@ -115,7 +115,7 @@ export default function AdminLayout({
           <button onClick={() => { setActiveTab('records'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'records' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
             <span className="flex items-center gap-3"><FileText size={18} /> 提出シート確認</span>
             {(() => {
-              const unreadCount = learningRecords.filter(r => !r.comment).length;
+              const unreadCount = (learningRecords || []).filter(r => !r.comment).length;
               return unreadCount > 0 ? <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{unreadCount}</span> : null;
             })()}
           </button>
@@ -125,7 +125,7 @@ export default function AdminLayout({
           <button onClick={() => { setActiveTab('approvals'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'approvals' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
             <span className="flex items-center gap-3"><CheckCircle2 size={18} /> カリキュラム承認</span>
             {(() => {
-              const pendingCount = completionRequests.filter(r => r.status === 'pending').length;
+              const pendingCount = (completionRequests || []).filter(r => r.status === 'pending').length;
               return pendingCount > 0 ? <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{pendingCount}</span> : null;
             })()}
           </button>
@@ -184,7 +184,7 @@ export default function AdminLayout({
               </header>
 
               <div className="space-y-4">
-                {completionRequests.filter(req => req.status === 'pending').map(req => {
+                {(completionRequests || []).filter(req => req.status === 'pending').map(req => {
                   const material = materials.find(m => m.id === req.materialId);
                   return (
                     <div key={req.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -215,7 +215,7 @@ export default function AdminLayout({
                   );
                 })}
 
-                {completionRequests.filter(req => req.status === 'pending').length === 0 && (
+                {(completionRequests || []).filter(req => req.status === 'pending').length === 0 && (
                   <div className="py-20 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
                     <CheckCircle2 size={48} className="mx-auto text-slate-300 mb-4" />
                     <p className="text-slate-500 font-bold">現在、承認待ちのカリキュラムはありません。</p>
@@ -307,8 +307,8 @@ export default function AdminLayout({
                     {studentSearchQuery && <button onClick={() => setStudentSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"><X size={14} /></button>}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {students.filter(s => !studentSearchQuery || s.name?.includes(studentSearchQuery) || s.school?.includes(studentSearchQuery)).map(s => {
-                    const studentMsgs = messages.filter(m => m.studentId === s.id);
+                  {(students || []).filter(s => !studentSearchQuery || s.name?.includes(studentSearchQuery) || s.school?.includes(studentSearchQuery)).map(s => {
+                    const studentMsgs = (messages || []).filter(m => m.studentId === s.id);
                     const hasUnread = studentMsgs.length > 0 && studentMsgs[studentMsgs.length - 1].senderId !== 'admin';
 
                     return (
@@ -344,8 +344,8 @@ export default function AdminLayout({
             const completedCount = s.completedMaterials?.length || 0;
             const totalMaterials = materials.length > 0 ? materials.length : 1;
             const progressPercentage = Math.min(100, Math.floor((completedCount / totalMaterials) * 100));
-            const studentRecords = learningRecords.filter(r => r.studentId === s.id).sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
-            const studentFiles = sb3Files.filter(f => f.studentId === s.id);
+            const studentRecords = (learningRecords || []).filter(r => r.studentId === s.id).sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
+            const studentFiles = (sb3Files || []).filter(f => f.studentId === s.id);
 
             return (
               <div className="space-y-8 animate-in slide-in-from-right-4 duration-500 text-left">
@@ -392,7 +392,7 @@ export default function AdminLayout({
                     <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col h-[500px]">
                        <h3 className="text-sm font-black text-slate-800 mb-4 border-b border-slate-100 pb-2 flex items-center gap-2"><MessageSquare size={16} className="text-orange-500"/> メッセージ</h3>
                        <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-4">
-                          {messages.filter(m => m.studentId === s.id).map(msg => {
+                          {(messages || []).filter(m => m.studentId === s.id).map(msg => {
                             const isAdmin = msg.senderId === 'admin';
                             return (
                               <div key={msg.id} className={`flex ${isAdmin ? 'justify-end' : 'justify-start'}`}>
@@ -404,7 +404,7 @@ export default function AdminLayout({
                               </div>
                             );
                           })}
-                          {messages.filter(m => m.studentId === s.id).length === 0 && <p className="text-center text-slate-400 text-xs mt-10">メッセージはまだありません</p>}
+                          {(messages || []).filter(m => m.studentId === s.id).length === 0 && <p className="text-center text-slate-400 text-xs mt-10">メッセージはまだありません</p>}
                        </div>
                        <form onSubmit={(e) => sendMessage(e, s.id, s.id)} className="flex gap-2 shrink-0">
                           <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="メッセージを入力..." className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-500" />
@@ -560,7 +560,7 @@ export default function AdminLayout({
                     <div key={category} className="mb-6 border-b border-slate-100 pb-4">
                       <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-4">{category === 'goal' ? '目標シート (授業前)' : '振り返りシート (授業後)'}</h3>
                       <div className="space-y-3">
-                        {reflectionTemplate.filter(i => (i.category || 'goal') === category).map((item, idx) => (
+                        {(reflectionTemplate || []).filter(i => (i.category || 'goal') === category).map((item, idx) => (
                           <div key={item.id} className="bg-white p-4 rounded-2xl border border-slate-200 flex justify-between items-center shadow-sm text-left group">
                             <div className="flex gap-4 items-center">
                               <span className="text-xl font-black text-slate-200">{idx + 1}</span>
@@ -588,10 +588,10 @@ export default function AdminLayout({
               </header>
 
               <div className="space-y-6">
-                {learningRecords.length === 0 ? (
-                  <div className="bg-white rounded-3xl border border-dashed border-slate-200 p-20 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">提出記録はありません</div>
+                {(learningRecords || []).filter(r => !r.comment).length === 0 ? (
+                  <div className="bg-white rounded-3xl border border-dashed border-slate-200 p-20 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">未確認の提出記録はありません</div>
                 ) : (
-                  learningRecords.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()).map(record => (
+                  (learningRecords || []).filter(r => !r.comment).sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()).map(record => (
                     <div key={record.id} className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm text-left p-6 md:p-8">
                       <div className="flex flex-col md:flex-row gap-6">
                         <div className="flex-1 space-y-4">
