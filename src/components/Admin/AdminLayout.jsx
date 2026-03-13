@@ -20,7 +20,8 @@ import {
   Download,
   Link as LinkIcon,
   MessageSquare,
-  Key
+  Key,
+  FileArchive
 } from 'lucide-react';
 
 export default function AdminLayout({
