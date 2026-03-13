@@ -24,6 +24,8 @@ import {
   FileArchive
 } from 'lucide-react';
 
+import { getMaterialThumbnail } from '../../utils/materialUtils';
+
 export default function AdminLayout({
   activeTab,
   setActiveTab,
@@ -474,16 +476,25 @@ export default function AdminLayout({
                       <p className="text-[9px] text-slate-400">※URLを直接入力するか、アップロードボタンからファイルを選択してください。</p>
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left block">サムネイル画像URL</label>
-                      <div className="flex gap-2">
-                        <input type="url" placeholder="サムネイル画像URL (任意)" value={materialForm.thumbnailUrl || ''} onChange={e => setMaterialForm({ ...materialForm, thumbnailUrl: e.target.value })} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" />
-                        <label className={`shrink-0 cursor-pointer flex items-center justify-center p-2.5 rounded-xl border border-slate-200 transition-colors ${isUploadingMaterialThumbnail ? 'bg-slate-100 text-slate-400 pointer-events-none' : 'bg-white hover:bg-slate-50 text-slate-600 hover:text-orange-600'}`} title="サムネイル画像のアップロード">
-                           {isUploadingMaterialThumbnail ? <Loader2 size={18} className="animate-spin" /> : <ImageIcon size={18} />}
-                           <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadMaterialFile(e, 'thumbnail')} />
-                        </label>
+                    {materialForm.category === 'scratch' ? (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left block">サムネイル画像</label>
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-slate-500 text-center">
+                          Scratchのサムネイルは自動設定されるため入力不要です
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left block">サムネイル画像URL</label>
+                        <div className="flex gap-2">
+                          <input type="url" placeholder="サムネイル画像URL (任意)" value={materialForm.thumbnailUrl || ''} onChange={e => setMaterialForm({ ...materialForm, thumbnailUrl: e.target.value })} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" />
+                          <label className={`shrink-0 cursor-pointer flex items-center justify-center p-2.5 rounded-xl border border-slate-200 transition-colors ${isUploadingMaterialThumbnail ? 'bg-slate-100 text-slate-400 pointer-events-none' : 'bg-white hover:bg-slate-50 text-slate-600 hover:text-orange-600'}`} title="サムネイル画像のアップロード">
+                             {isUploadingMaterialThumbnail ? <Loader2 size={18} className="animate-spin" /> : <ImageIcon size={18} />}
+                             <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadMaterialFile(e, 'thumbnail')} />
+                          </label>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="space-y-1">
                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left block">ダウンロード素材URL</label>
@@ -511,7 +522,7 @@ export default function AdminLayout({
                       <div className="flex gap-4">
                         <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 relative">
                            {m.isPublished === false && <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center"><span className="text-[9px] font-black text-white bg-slate-900 px-2 py-0.5 rounded-full uppercase tracking-widest">非公開</span></div>}
-                           <img src={m.thumbnailUrl || ''} alt="" className="w-full h-full object-cover" />
+                           <img src={m.thumbnailUrl || getMaterialThumbnail(m.category)} alt="" className="w-full h-full object-cover" />
                         </div>
                         <div className="text-left"><h4 className="font-black text-slate-800 text-lg text-left break-all">{m.title}</h4><div className="flex flex-wrap gap-2 mt-2 text-left"><span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter text-left">{m.category}</span>{m.downloadUrl && <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center gap-1"><Download size={9} /> DLあり</span>}</div><a href={m.url} target="_blank" className="text-orange-600 text-xs font-black flex items-center gap-1 mt-4 hover:underline text-left uppercase truncate max-w-full">Open <LinkIcon size={12} /></a></div>
                       </div>
