@@ -391,6 +391,7 @@ const App = () => {
           reflectionTemplate={reflectionTemplate}
           completionRequests={completionRequests}
           messages={messages}
+          sb3Files={sb3Files}
           storageUsage={storageUsage}
           setStorageUsage={setStorageUsage}
           editingStudent={editingStudent}
