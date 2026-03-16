@@ -144,7 +144,7 @@ export default function StudentLayout({
             <header className="flex flex-col md:flex-row justify-between items-start gap-6 text-left">
               <div className="text-left">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                  <h2 className="text-3xl font-black tracking-tight text-left text-slate-800">{currentUser.name}様 <span className="text-orange-600 font-light ml-2 uppercase">My Portal</span></h2>
+                  <h2 className="text-3xl font-black tracking-tight text-left text-slate-800">{currentUser.name}さん <span className="text-orange-500 font-bold ml-2">のページ</span></h2>
                   {currentUser.role === 'parent' && currentUser.allChildren && currentUser.allChildren.length > 1 && (
                     <select
                       value={currentUser.childId}
@@ -168,10 +168,10 @@ export default function StudentLayout({
                     </select>
                   )}
                 </div>
-                <p className="text-slate-400 text-sm font-medium mt-1 text-left">今日学んだことや作品を記録して成長をポートフォリオに残しましょう。</p>
+                <p className="text-slate-400 text-sm font-medium mt-1 text-left">きょうやったことや、つくったものをきろくして、せいちょうをのこそう！</p>
               </div>
               <div className="shrink-0">
-                <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xl flex flex-col justify-center"><p className="text-[10px] font-black text-slate-400 uppercase mb-1 flex items-center gap-1.5 tracking-widest"><Clock size={12} className="text-orange-500" /> Next Lesson</p><p className="text-xl font-black text-slate-800 whitespace-nowrap">{currentUser.nextClassDate || '未設定'}</p></div>
+                <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xl flex flex-col justify-center"><p className="text-[10px] font-black text-slate-400 uppercase mb-1 flex items-center gap-1.5 tracking-widest"><Clock size={12} className="text-orange-500" /> つぎのじゅぎょう</p><p className="text-xl font-black text-slate-800 whitespace-nowrap">{currentUser.nextClassDate || 'まだ設定されていないよ'}</p></div>
               </div>
             </header>
 
@@ -196,7 +196,7 @@ export default function StudentLayout({
                   </div>
                   <div className="flex-1 w-full space-y-4 text-center md:text-left">
                     <div>
-                      <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-1">現在のクラス</p>
+                      <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-1">いまのレベル</p>
                       <div className="flex items-center justify-center md:justify-start gap-3">
                         <span className={`text-3xl font-black tabular-nums px-3 py-1 rounded-xl shadow-sm bg-white/60 ${charInfo.color}`}>Lv.{level}</span>
                         <h3 className={`text-2xl font-black flex items-center gap-2 ${charInfo.color}`}>
@@ -207,9 +207,9 @@ export default function StudentLayout({
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between items-center text-xs font-bold text-slate-600">
-                        <span>⚡ 経験値 (XP)</span>
+                        <span>⚡ けいけんち (XP)</span>
                         {isMaxLevel
-                          ? <span className="text-amber-600 font-black">🏆 最大レベル達成！</span>
+                          ? <span className="text-amber-600 font-black">🏆 さいこうレベルにとうたつ！</span>
                           : <span>{xpInLevel} / {xpToNext} XP</span>
                         }
                       </div>
@@ -228,12 +228,12 @@ export default function StudentLayout({
                     </div>
                     {!isMaxLevel && nextEvolution && (
                       <p className="text-[11px] font-bold text-slate-500 bg-white/40 rounded-xl px-3 py-2">
-                        ✨ Lv.{nextEvolution}で進化！あと <span className="font-black text-indigo-600">{(XP_CUMULATIVE[nextEvolution - 2] - studentXp).toLocaleString()} XP</span> 必要
+                        ✨ Lv.{nextEvolution}でしんか！あと <span className="font-black text-indigo-600">{(XP_CUMULATIVE[nextEvolution - 2] - studentXp).toLocaleString()} XP</span> ためよう！
                       </p>
                     )}
                     <div className="flex flex-wrap gap-2 text-[10px]">
-                      <span className="bg-white/50 px-2 py-1 rounded-lg font-bold text-slate-500">📝 振り返り承認 +30XP</span>
-                      <span className="bg-white/50 px-2 py-1 rounded-lg font-bold text-slate-500">🎯 カリキュラム完了 +50XP</span>
+                      <span className="bg-white/50 px-2 py-1 rounded-lg font-bold text-slate-500">📝 ふりかえりをほめられたら +30XP</span>
+                      <span className="bg-white/50 px-2 py-1 rounded-lg font-bold text-slate-500">🎯 カリキュラムをクリア +50XP</span>
                       <span className="bg-white/50 px-2 py-1 rounded-lg font-bold text-slate-500">🎮 ゲームクリア +20XP</span>
                     </div>
                   </div>
@@ -271,7 +271,7 @@ export default function StudentLayout({
                       <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3">
                         <span className="text-2xl">🌟</span>
                         <div className="text-left">
-                          <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">所持ポイント</p>
+                          <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">もってるポイント</p>
                           <p className="text-3xl font-black text-amber-600 leading-none">{points}</p>
                         </div>
                       </div>
@@ -279,9 +279,9 @@ export default function StudentLayout({
 
                     <div className="grid grid-cols-3 gap-4">
                       {[
-                        { key: 'hp', label: 'HP', icon: '❤️', color: 'from-rose-400 to-pink-500', desc: '体力アップ' },
-                        { key: 'atk', label: 'ATK', icon: '⚡', color: 'from-orange-400 to-amber-500', desc: '攻撃力アップ' },
-                        { key: 'def', label: 'DEF', icon: '🛡️', color: 'from-sky-400 to-blue-500', desc: '防御力アップ' },
+                        { key: 'hp', label: 'HP', icon: '❤️', color: 'from-rose-400 to-pink-500', desc: 'たいりょくアップ' },
+                        { key: 'atk', label: 'ATK', icon: '⚡', color: 'from-orange-400 to-amber-500', desc: 'こうげきりょくアップ' },
+                        { key: 'def', label: 'DEF', icon: '🛡️', color: 'from-sky-400 to-blue-500', desc: 'ぼうぎょりょくアップ' },
                       ].map(({ key, label, icon, color, desc }) => (
                         <div key={key} className={`bg-gradient-to-br ${color} rounded-2xl p-4 text-white text-center shadow-lg`}>
                           <div className="text-3xl mb-1">{icon}</div>
@@ -296,7 +296,7 @@ export default function StudentLayout({
                                 : 'bg-white/10 text-white/40 cursor-not-allowed'
                               }`}
                           >
-                            {points > 0 ? '+1 つかう' : 'ポイントなし'}
+                            {points > 0 ? '+1 つかう' : 'ポイントがないよ'}
                           </button>
                         </div>
                       ))}
@@ -304,7 +304,7 @@ export default function StudentLayout({
 
                     {points > 0 && (
                       <p className="text-center text-xs text-slate-500 font-bold mt-4">
-                        🌟 {points}ポイント持ってる！ゲームで有利になるステータスに振り分けよう！
+                        🌟 {points}ポイントあるよ！ゲームをゆうりにするためにつかおう！
                       </p>
                     )}
                   </div>
@@ -323,7 +323,7 @@ export default function StudentLayout({
                     />
 
                     <div className="bg-white rounded-[2rem] border border-slate-200 shadow-lg p-6 md:p-8">
-                      <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6">🛡️ 現在の装備と持ち物</h3>
+                      <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-6">🛡️ いまつけているそうびともちもの</h3>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                         {['weapon', 'armor', 'accessory'].map(type => {
@@ -331,7 +331,7 @@ export default function StudentLayout({
                           const eqItem = GACHA_ITEMS.find(i => i.id === eqId);
                           return (
                             <div key={type} className="bg-slate-50 rounded-2xl p-4 border border-slate-200 relative overflow-hidden group">
-                              <div className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3 text-left">{type === 'weapon' ? '⚔️ 武器' : type === 'armor' ? '🛡️ 防具' : '💍 装飾品'}</div>
+                              <div className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3 text-left">{type === 'weapon' ? '⚔️ ぶき' : type === 'armor' ? '🛡️ よろい' : '💍 アクセサリー'}</div>
                               {eqItem ? (
                                 <div className="space-y-2 text-left">
                                   <h4 className={`font-black text-lg ${eqItem.rarity === 'SS' ? 'text-fuchsia-600' : eqItem.rarity === 'S' ? 'text-rose-600' : 'text-slate-800'}`}>
@@ -348,10 +348,10 @@ export default function StudentLayout({
                                       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', currentUser.studentId), { equipped: newEquipped });
                                     }}
                                     className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 p-2 bg-rose-100 text-rose-500 rounded-lg hover:bg-rose-500 hover:text-white transition-all"
-                                  >外す</button>
+                                  >はずす</button>
                                 </div>
                               ) : (
-                                <div className="text-slate-400 font-medium text-sm py-4 text-center border-2 border-dashed border-slate-200 rounded-xl">未装備</div>
+                                <div className="text-slate-400 font-medium text-sm py-4 text-center border-2 border-dashed border-slate-200 rounded-xl">なにもつけてないよ</div>
                               )}
                             </div>
                           );
@@ -359,9 +359,9 @@ export default function StudentLayout({
                       </div>
 
                       <div className="border-t border-slate-100 pt-6">
-                        <h4 className="text-sm font-black text-slate-600 mb-4 text-left">持ち物（インベントリ）</h4>
+                        <h4 className="text-sm font-black text-slate-600 mb-4 text-left">もちもの</h4>
                         {inventory.length === 0 ? (
-                          <p className="text-sm text-slate-400 text-center py-8">ガチャを回して装備を手に入れよう！</p>
+                          <p className="text-sm text-slate-400 text-center py-8">ガチャをまわして、そうびをてにいれよう！</p>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-2">
                             {Object.values(inventory.reduce((acc, itemId) => {
@@ -394,9 +394,9 @@ export default function StudentLayout({
                                         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', currentUser.studentId), { equipped: newEquipped });
                                       }}
                                       className="shrink-0 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-lg hover:bg-orange-500 transition-colors"
-                                    >装備する</button>
+                                    >そうびする</button>
                                   )}
-                                  {isEquipped && <span className="text-[10px] font-black text-emerald-600 bg-emerald-100 px-2 py-1 rounded-md shrink-0">装備中</span>}
+                                  {isEquipped && <span className="text-[10px] font-black text-emerald-600 bg-emerald-100 px-2 py-1 rounded-md shrink-0">そうびちゅう</span>}
                                 </div>
                               );
                             })}
@@ -422,9 +422,9 @@ export default function StudentLayout({
                     <Trophy size={32} className="text-white" />
                   </div>
                   <div className="flex-1 text-left">
-                    <p className="text-xs font-black uppercase tracking-widest opacity-80 mb-1">✨ 次に挑戦しよう！</p>
+                    <p className="text-xs font-black uppercase tracking-widest opacity-80 mb-1">✨ つぎはこれにチャレンジしよう！</p>
                     <h3 className="text-xl font-black leading-tight">{nextMaterial.title}</h3>
-                    <p className="text-sm opacity-80 font-medium mt-1">{nextMaterial.category} カリキュラム</p>
+                    <p className="text-sm opacity-80 font-medium mt-1">{nextMaterial.category} コース</p>
                   </div>
                   <button
                     onClick={() => setActiveTab('materials')}
@@ -442,8 +442,8 @@ export default function StudentLayout({
                   <div className="flex items-center gap-3 text-left">
                     <div className="bg-orange-600 p-3 rounded-2xl text-white shadow-lg"><BookOpen size={22} /></div>
                     <div>
-                      <h3 className="text-xl font-black text-slate-800">学習を記録する</h3>
-                      <p className="text-xs text-slate-400 font-medium mt-0.5">今日の目標や振り返りを書いて保存しましょう</p>
+                      <h3 className="text-xl font-black text-slate-800">べんきょうをきろくしよう</h3>
+                      <p className="text-xs text-slate-400 font-medium mt-0.5">きょうのもくひょうやふりかえりをかいてほぞんしよう</p>
                     </div>
                   </div>
 
@@ -453,21 +453,21 @@ export default function StudentLayout({
                       onClick={() => setNewLearningRecord({ ...newLearningRecord, recordType: 'goal', content: newLearningRecord.goalContent || {} })}
                       className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${newLearningRecord.recordType === 'goal' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                     >
-                      目標シート (前)
+                      もくひょうシート（まえ）
                     </button>
                     <button
                       type="button"
                       onClick={() => setNewLearningRecord({ ...newLearningRecord, recordType: 'reflection', goalContent: newLearningRecord.content, content: newLearningRecord.reflectionContent || {} })}
                       className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${newLearningRecord.recordType === 'reflection' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                     >
-                      振り返りシート (後)
+                      ふりかえりシート（あと）
                     </button>
                   </div>
                 </div>
 
                 <form onSubmit={submitLearningRecord} className="space-y-6 text-left">
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">授業日 (いつの授業？)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">じゅぎょうの日（いつのじゅぎょう？）</label>
                     <input
                       type="date"
                       value={newLearningRecord.lessonDate || ''}
@@ -477,8 +477,8 @@ export default function StudentLayout({
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">タイトル ({newLearningRecord.recordType === 'goal' ? '目標のタイトル' : '振り返りのタイトル'})</label>
-                    <input type="text" value={newLearningRecord.title} onChange={e => setNewLearningRecord({ ...newLearningRecord, title: e.target.value })} className={`w-full bg-slate-50 border rounded-2xl px-5 py-4 text-base font-bold outline-none transition-all ${newLearningRecord.recordType === 'goal' ? 'border-emerald-100 focus:ring-emerald-500' : 'border-slate-200 focus:ring-orange-500'}`} placeholder={newLearningRecord.recordType === 'goal' ? "例: 今日はScratchでゲームを完成させる！" : "例: Scratchでアニメーションを作った！"} required />
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">タイトル（{newLearningRecord.recordType === 'goal' ? 'もくひょうのタイトル' : 'ふりかえりのタイトル'}）</label>
+                    <input type="text" value={newLearningRecord.title} onChange={e => setNewLearningRecord({ ...newLearningRecord, title: e.target.value })} className={`w-full bg-slate-50 border rounded-2xl px-5 py-4 text-base font-bold outline-none transition-all ${newLearningRecord.recordType === 'goal' ? 'border-emerald-100 focus:ring-emerald-500' : 'border-slate-200 focus:ring-orange-500'}`} placeholder={newLearningRecord.recordType === 'goal' ? "れい: きょうはScratchでゲームをかんせいさせる！" : "れい: Scratchでアニメーションをつくった！"} required />
                   </div>
                   {learningRecords.length >= 0 && (() => {
                     const template = learningRecords[0]?.template || []; // In real scenario, template is passed
@@ -489,16 +489,16 @@ export default function StudentLayout({
                   {/* Note: In target components, ensure template is passed or accessible */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">成果物の画像URL（任意）</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">つくったものの画像URL（なくてもOK）</label>
                       <input type="url" placeholder="https://..." value={newLearningRecord.imageUrl} onChange={e => setNewLearningRecord({ ...newLearningRecord, imageUrl: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500 transition-all" />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">作品リンク (Canva等・任意)</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">さくひんのリンク（Canvaなど・なくてもOK）</label>
                       <input type="url" placeholder="https://..." value={newLearningRecord.linkUrl} onChange={e => setNewLearningRecord({ ...newLearningRecord, linkUrl: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-500 transition-all" />
                     </div>
                   </div>
                   <button type="submit" className={`w-full text-white font-black py-5 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-3 active:scale-95 text-base uppercase tracking-widest ${newLearningRecord.recordType === 'goal' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-orange-600 hover:bg-orange-700'}`}>
-                    <Save size={20} /> {newLearningRecord.recordType === 'goal' ? '目標を保存する' : '振り返りを保存する'}
+                    <Save size={20} /> {newLearningRecord.recordType === 'goal' ? 'もくひょうをほぞんする' : 'ふりかえりをほぞんする'}
                   </button>
                 </form>
               </div>
@@ -511,20 +511,20 @@ export default function StudentLayout({
                   <div className="flex items-center gap-3 text-left">
                     <div className="bg-slate-800 p-3 rounded-2xl text-white shadow-lg"><FileArchive size={22} /></div>
                     <div>
-                      <h3 className="text-xl font-black text-slate-800">Scratchファイル管理</h3>
-                      <p className="text-xs text-slate-400 font-medium mt-0.5">.sb3 ファイルを日ごとにアップロードして管理できます</p>
+                      <h3 className="text-xl font-black text-slate-800">Scratchファイルをかんりする</h3>
+                      <p className="text-xs text-slate-400 font-medium mt-0.5">.sb3ファイルをひにちごとにアップロードできるよ</p>
                     </div>
                   </div>
                   <div>
                     <input ref={sb3InputRef} type="file" accept=".sb3" onChange={uploadSb3File} className="hidden" id="sb3-upload" />
                     <label htmlFor="sb3-upload" className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-sm cursor-pointer transition-all shadow-md active:scale-95 uppercase tracking-wider ${isUploadingSb3 ? 'bg-slate-200 text-slate-400 pointer-events-none' : 'bg-slate-900 text-white hover:bg-orange-600'}`}>
                       {isUploadingSb3 ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
-                      {isUploadingSb3 ? 'アップロード中...' : '.sb3をアップロード'}
+                      {isUploadingSb3 ? 'アップロードちゅう...' : '.sb3ファイルをアップロードする'}
                     </label>
                   </div>
                 </div>
                 {sb3Files.length === 0 ? (
-                  <div className="border border-dashed border-slate-200 rounded-2xl py-16 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">アップロード済みのファイルはありません</div>
+                  <div className="border border-dashed border-slate-200 rounded-2xl py-16 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">まだアップロードしたファイルはないよ</div>
                 ) : (
                   <div className="space-y-3">
                     {sb3Files.map(file => (
@@ -591,7 +591,7 @@ export default function StudentLayout({
             <div className="space-y-6 animate-in fade-in duration-500 text-left">
               <header>
                 <h2 className="text-2xl font-black text-slate-800 tracking-tight">🎮 タイピングバトル</h2>
-                <p className="text-sm text-slate-500 font-medium mt-1">XPを貯めてキャラクターをレベルアップさせよう！</p>
+                <p className="text-sm text-slate-500 font-medium mt-1">XPをためてキャラクターをレベルアップさせよう！</p>
               </header>
               <TypingGame
                 studentId={currentUser.studentId}
@@ -648,10 +648,10 @@ export default function StudentLayout({
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {[
-                  { label: '総授業回数', value: `${groupedEntries.length}回`, icon: '📅', color: 'from-teal-400 to-emerald-500' },
-                  { label: '記録数', value: `${myRecords.length}件`, icon: '📝', color: 'from-sky-400 to-blue-500' },
-                  { label: '獲得ポイント', value: `${pointsEarned}pt`, icon: '🌟', color: 'from-amber-400 to-orange-500' },
-                  { label: 'カリキュラム進捗', value: `${progressPercentage}%`, icon: '🎯', color: 'from-violet-400 to-purple-500' },
+                  { label: 'じゅぎょうの回数', value: `${groupedEntries.length}回`, icon: '📅', color: 'from-teal-400 to-emerald-500' },
+                  { label: 'きろく数', value: `${myRecords.length}件`, icon: '📝', color: 'from-sky-400 to-blue-500' },
+                  { label: 'もらったポイント', value: `${pointsEarned}pt`, icon: '🌟', color: 'from-amber-400 to-orange-500' },
+                  { label: 'カリキュラムのすすみ', value: `${progressPercentage}%`, icon: '🎯', color: 'from-violet-400 to-purple-500' },
                 ].map(({ label, value, icon, color }) => (
                   <div key={label} className={`bg-gradient-to-br ${color} rounded-2xl p-5 text-white shadow-lg`}>
                     <div className="text-3xl mb-2">{icon}</div>
@@ -695,7 +695,7 @@ export default function StudentLayout({
                         </div>
 
                         <p className="text-xs font-black text-teal-600 uppercase tracking-widest mb-3">
-                          {date} の授業 — {records.length}件の記録
+                          {date} のじゅぎょう — {records.length}件のきろく
                         </p>
 
                         <div className="space-y-4">
@@ -703,7 +703,7 @@ export default function StudentLayout({
                             <div key={record.id} className={`rounded-2xl border p-5 shadow-sm ${record.recordType === 'goal' ? 'bg-emerald-50 border-emerald-100' : 'bg-orange-50 border-orange-100'}`}>
                               <div className="flex items-center gap-2 mb-2">
                                 <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${record.recordType === 'goal' ? 'bg-emerald-500 text-white' : 'bg-orange-500 text-white'}`}>
-                                  {record.recordType === 'goal' ? '🎯 目標' : '📝 振り返り'}
+                                  {record.recordType === 'goal' ? '🎯 もくひょう' : '📝 ふりかえり'}
                                 </span>
                                 {record.commentPointed && (
                                   <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-100 text-amber-600">🌟 +1pt</span>
@@ -727,7 +727,7 @@ export default function StudentLayout({
 
                               {(currentUser.role === 'parent' || (currentUser.role === 'student' && record.parentComment)) && (
                                 <div className="mt-3 p-3 rounded-xl border border-sky-200 bg-white text-sm">
-                                  <p className="text-[9px] font-black uppercase tracking-widest text-sky-500 mb-1">💙 保護者コメント</p>
+                                  <p className="text-[9px] font-black uppercase tracking-widest text-sky-500 mb-1">💙 おうちのひとのメッセージ</p>
                                   {record.parentComment && <p className="font-bold text-slate-700 italic mb-2">"{record.parentComment}"</p>}
                                   {currentUser.role === 'parent' && (
                                     <div className="flex gap-2">
@@ -764,7 +764,7 @@ export default function StudentLayout({
                       </div>
                       <div className="ml-0 py-4">
                         <p className="text-sm font-black text-violet-500">これからも頑張ろう！</p>
-                        <p className="text-xs text-slate-400 font-medium">記録を続けて成長の軌跡を積み上げよう。</p>
+                        <p className="text-xs text-slate-400 font-medium">きろくをつづけて、もっともっとせいちょうしていこう！</p>
                       </div>
                     </div>
                   </div>
@@ -777,7 +777,7 @@ export default function StudentLayout({
         {/* 教材一覧 (受講生・保護者用) */}
         {(currentUser.role === 'student' || currentUser.role === 'parent') && activeTab === 'materials' && (
           <div className="space-y-8 text-left animate-in fade-in duration-500">
-            <header className="text-left"><h2 className="text-2xl font-black text-slate-800 tracking-tight text-left">教材・リソースライブラリ</h2></header>
+            <header className="text-left"><h2 className="text-2xl font-black text-slate-800 tracking-tight text-left">きょうざいをみよう</h2></header>
             <div className="space-y-12">
               {[...MATERIAL_CATEGORIES, { id: 'other', label: 'その他' }].map(category => {
                 const categoryMaterials = category.id === 'other'
@@ -835,7 +835,7 @@ export default function StudentLayout({
                                 let buttonState = {
                                   bg: 'bg-slate-100 text-slate-500 hover:bg-orange-600 hover:text-white border border-slate-200 hover:border-transparent hover:shadow-lg',
                                   icon: <Star size={18} />,
-                                  text: 'カリキュラムを完了',
+                                  text: 'カリキュラムをクリアしたよ！',
                                   disabled: false
                                 };
 
@@ -843,28 +843,28 @@ export default function StudentLayout({
                                   buttonState = {
                                     bg: 'bg-emerald-100 text-emerald-600 border border-emerald-200 shadow-inner cursor-default',
                                     icon: <CheckCircle2 size={18} />,
-                                    text: '完了！クリア',
+                                    text: 'クリア！',
                                     disabled: true
                                   };
                                 } else if (hasPending) {
                                   buttonState = {
                                     bg: 'bg-amber-100 text-amber-600 border border-amber-200 shadow-inner cursor-default',
                                     icon: <Clock size={18} />,
-                                    text: '承認待ち',
+                                    text: 'せんせいがかくにんちゅう',
                                     disabled: true
                                   };
                                 } else if (hasRejected) {
                                   buttonState = {
                                     bg: 'bg-rose-100 text-rose-600 border border-rose-200 hover:bg-rose-500 hover:text-white hover:border-transparent shadow-sm',
                                     icon: <Menu size={18} />,
-                                    text: '再挑戦して提出!',
+                                    text: 'もういちどやってみよう！',
                                     disabled: false
                                   };
                                 }
 
                                 return (
                                   <>
-                                    {hasRejected && <p className="text-[10px] text-rose-500 font-bold mb-1 text-center animate-pulse">先生から差し戻しがありました確認してね</p>}
+                                    {hasRejected && <p className="text-[10px] text-rose-500 font-bold mb-1 text-center animate-pulse">せんせいからおくりかえされたよ。もういちどやってみよう！</p>}
                                     <button
                                       onClick={(e) => { if (!buttonState.disabled) toggleMaterialComplete(e, m.id) }}
                                       disabled={buttonState.disabled}
@@ -880,7 +880,7 @@ export default function StudentLayout({
                                 <div className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest border ${isCompleted ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'
                                   }`}>
                                   {isCompleted ? <CheckCircle2 size={18} /> : <div className="w-2 h-2 rounded-full bg-slate-300" />}
-                                  {isCompleted ? '学習完了済' : '未完了'}
+                                  {isCompleted ? 'かんりょうしたよ！' : 'まだだよ'}
                                 </div>
                               )}
                             </div>

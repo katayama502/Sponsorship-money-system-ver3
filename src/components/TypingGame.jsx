@@ -307,7 +307,7 @@ const TypingGame = ({ studentId, studentXp = 0, completedCount, totalMaterials, 
         setShakePlayer(true);
         playSound('damage');
         setTimeout(() => setShakePlayer(false), 400);
-        addLog(`💥 ${selectedStage.name}の攻撃！ -${dmg}ダメージ${playerDef > 0 ? ` (防御${playerDef}軽減)` : ''}`, 'enemy');
+        addLog(`💥 ${selectedStage.name}のこうげき！ -${dmg}ダメージ${playerDef > 0 ? ` (ぼうぎょ${playerDef}けいげん)` : ''}`, 'enemy');
         return next;
       });
     }, ENEMY_ATTACK_INTERVAL_MS);
@@ -447,7 +447,7 @@ const TypingGame = ({ studentId, studentXp = 0, completedCount, totalMaterials, 
         {playerLevel < 5 && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
             <p className="text-sm font-bold text-amber-700">
-              🎯 XPを貯めてレベルアップすれば、強い敵に挑戦できるよ！（振り返り・カリキュラム・ゲームクリアでXPGET）
+              🎯 XPをためてレベルアップすれば、つよいてきにもチャレンジできるよ！（ふりかえり・カリキュラム・ゲームクリアでXPゲット！）
             </p>
           </div>
         )}
@@ -556,21 +556,21 @@ const TypingGame = ({ studentId, studentXp = 0, completedCount, totalMaterials, 
         <p className="text-slate-600 font-bold">「{selectedStage.name}」をたおした！！</p>
         <div className="flex justify-center gap-4 mt-6">
           <button onClick={() => setScreen('select')} className="bg-slate-100 text-slate-700 font-black px-6 py-3 rounded-2xl hover:bg-slate-200 transition-colors flex items-center gap-2">
-            <Shield size={16} /> ステージ一覧へ
+            <Shield size={16} /> ステージいちらんへ
           </button>
           {nextStage && nextStage.minLv <= playerLevel && (
             <button onClick={() => startBattle(nextStage)} className="bg-orange-500 text-white font-black px-6 py-3 rounded-2xl hover:bg-orange-600 transition-colors shadow-lg flex items-center gap-2">
-              次のステージへ <ChevronRight size={16} />
+              つぎのステージへ <ChevronRight size={16} />
             </button>
           )}
           {nextStage && nextStage.minLv > playerLevel && (
             <p className="bg-amber-100 text-amber-700 font-bold text-sm px-5 py-3 rounded-2xl">
-              🔒 次のステージはLv.{nextStage.minLv}～。カリキュラムをもっとやってレベルアップしよう！
+              🔒 つぎのステージはLv.{nextStage.minLv}～。カリキュラムをもっとやってレベルアップしよう！
             </p>
           )}
           {!nextStage && (
             <p className="bg-amber-100 text-amber-700 font-bold px-5 py-3 rounded-2xl">
-              👑 全ステージクリア！最強だ！！+20XP獲得！
+              👑 ぜんぶのステージをクリア！さいきょうだ！！+20XPかくとく！
             </p>
           )}
         </div>
@@ -589,15 +589,15 @@ const TypingGame = ({ studentId, studentXp = 0, completedCount, totalMaterials, 
         <p className="text-slate-600 font-bold">「{selectedStage.name}」にたおされた！</p>
         {playerLevel < 5 && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm font-bold text-amber-700">
-            💡 XPを貯めてレベルアップすれば、もっと強くなれるよ！
+            💡 XPをためてレベルアップすれば、もっとつよくなれるよ！
           </div>
         )}
         <div className="flex justify-center gap-4 mt-6">
           <button onClick={() => setScreen('select')} className="bg-slate-100 text-slate-700 font-black px-6 py-3 rounded-2xl hover:bg-slate-200 flex items-center gap-2">
-            <Shield size={16} /> ステージ一覧へ
+            <Shield size={16} /> ステージいちらんへ
           </button>
           <button onClick={() => startBattle(selectedStage)} className="bg-rose-500 text-white font-black px-6 py-3 rounded-2xl hover:bg-rose-600 shadow-lg flex items-center gap-2">
-            <RotateCcw size={16} /> もう一度挑戦
+            <RotateCcw size={16} /> もういちどちょうせん
           </button>
         </div>
       </div>

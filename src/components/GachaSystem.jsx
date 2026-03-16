@@ -63,14 +63,14 @@ export default function GachaSystem({ points, onRoll }) {
           <header>
             <h3 className="text-2xl font-black text-slate-800 flex items-center justify-center md:justify-start gap-3">
               <PackageOpen className="text-fuchsia-500" size={28} />
-              装備ガチャ
+              そうびガチャ
             </h3>
-            <p className="text-sm text-slate-500 font-medium mt-2">10ポイントでガチャを回して強力な装備をゲットしよう！</p>
+            <p className="text-sm text-slate-500 font-medium mt-2">10ポイントでガチャをまわして、つよいそうびをゲットしよう！</p>
           </header>
 
           <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex flex-col items-center">
             <div className="text-center mb-6">
-              <p className="text-xs font-black tracking-widest text-slate-400 uppercase mb-1">現在の保有ポイント</p>
+              <p className="text-xs font-black tracking-widest text-slate-400 uppercase mb-1">いまもってるポイント</p>
               <div className="text-4xl font-black text-amber-500 flex items-center justify-center gap-2">
                 <Coins size={32} />
                 {points} <span className="text-lg text-slate-400">pt</span>
@@ -87,14 +87,14 @@ export default function GachaSystem({ points, onRoll }) {
               }`}
             >
               <Sparkles size={24} className={isRolling ? 'animate-spin' : 'animate-pulse'} />
-              {isRolling ? 'ガチャを回しています...' : '1回 10pt で回す'}
+              {isRolling ? 'ガチャをまわしているよ...' : '1かい 10ポイントでまわす'}
             </button>
             {error && <p className="text-rose-500 font-bold text-sm mt-3 animate-bounce">{error}</p>}
           </div>
 
           {/* Probability Table */}
           <div className="bg-white border rounded-xl overflow-hidden text-xs">
-            <div className="bg-slate-50 p-3 border-b font-black text-slate-600 text-center">排出確率</div>
+            <div className="bg-slate-50 p-3 border-b font-black text-slate-600 text-center">でやすさ</div>
             <div className="grid grid-cols-5 divide-x">
               {RARITY_RATES.map(r => (
                 <div key={r.rarity} className="p-3 text-center flex flex-col gap-1 items-center">
@@ -131,7 +131,7 @@ export default function GachaSystem({ points, onRoll }) {
                 </div>
                 <h4 className="text-3xl font-black text-white mb-2 tracking-tight drop-shadow-md">{result.name}</h4>
                 <p className="text-[10px] font-bold text-slate-400 mb-6 uppercase tracking-widest">
-                  {result.type === 'weapon' ? '⚔️ 武器' : result.type === 'armor' ? '🛡️ 防具' : '💍 装飾品'}
+                  {result.type === 'weapon' ? '⚔️ ぶき' : result.type === 'armor' ? '🛡️ よろい' : '💍 アクセサリー'}
                 </p>
                 
                 <div className="grid grid-cols-3 gap-2 mb-6">
@@ -155,7 +155,7 @@ export default function GachaSystem({ points, onRoll }) {
           ) : (
             <div className="relative z-10 text-slate-500 flex flex-col items-center gap-3">
               <PackageOpen size={48} className="opacity-30" />
-              <p className="text-sm font-black tracking-widest">ガチャを回して結果を見よう</p>
+              <p className="text-sm font-black tracking-widest">ガチャをまわしてけっかをみよう</p>
             </div>
           )}
         </div>

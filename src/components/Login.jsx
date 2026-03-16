@@ -10,7 +10,7 @@ export default function Login({ loginId, setLoginId, password, setPassword, hand
             <Calculator size={32} />
           </div>
           <h1 className="text-2xl font-black tracking-tighter uppercase">クリエットアプリ</h1>
-          <p className="text-slate-400 text-[10px] font-bold tracking-[0.3em] uppercase text-center">一緒に楽しいプログラミングを学びましょう</p>
+          <p className="text-slate-400 text-[10px] font-bold tracking-[0.3em] uppercase text-center">いっしょにたのしいプログラミングをまなぼう！</p>
         </div>
         <form onSubmit={handleLogin} className="space-y-6 text-left">
           <div className="space-y-4 text-left">
