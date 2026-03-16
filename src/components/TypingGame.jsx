@@ -358,9 +358,12 @@ const TypingGame = ({ studentId, studentXp = 0, completedCount, totalMaterials, 
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [battleLog]);
 
-  // Focus input
+  // Focus input and scroll into view on mobile to avoid keyboard overlap
   useEffect(() => {
-    if (screen === 'battle' && inputRef.current) inputRef.current.focus();
+    if (screen === 'battle' && inputRef.current) {
+      inputRef.current.focus();
+      setTimeout(() => inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+    }
   }, [screen, currentWord]);
 
   const handleInput = (e) => {
@@ -511,7 +514,16 @@ const TypingGame = ({ studentId, studentXp = 0, completedCount, totalMaterials, 
 
           {/* Header */}
           <div className="relative flex items-center gap-3 mb-4">
-            <button onClick={() => { clearInterval(enemyTimerRef.current); setScreen('select'); }} className="p-2 bg-white/20 hover:bg-white/30 rounded-xl text-white transition-colors backdrop-blur-sm">
+            <button
+              onClick={() => {
+                if (window.confirm('バトルをやめてステージいちらんにもどりますか？')) {
+                  clearInterval(enemyTimerRef.current);
+                  setScreen('select');
+                }
+              }}
+              aria-label="ステージ一覧に戻る"
+              className="p-2 bg-white/20 hover:bg-white/30 rounded-xl text-white transition-colors backdrop-blur-sm"
+            >
               <X size={16} />
             </button>
             <h3 className="font-black text-white text-lg drop-shadow">⚔️ Stage {selectedStage.id}: {selectedStage.name}</h3>
@@ -546,7 +558,10 @@ const TypingGame = ({ studentId, studentXp = 0, completedCount, totalMaterials, 
             {currentWord && (
               <>
                 <p className="text-white text-4xl font-black mb-1 tracking-widest">{currentWord.kana}</p>
-                <p className="text-white/50 text-base font-mono font-bold tracking-widest">[{currentWord.romaji}]</p>
+                <p className={`text-base font-mono font-bold tracking-widest transition-colors ${isWrongInput ? 'text-rose-400' : 'text-white/50'}`}>
+                  [{currentWord.romaji}]
+                  {isWrongInput && <span className="ml-2 text-rose-300 text-xs font-bold">← こたえ</span>}
+                </p>
               </>
             )}
           </div>

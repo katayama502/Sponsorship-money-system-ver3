@@ -20,30 +20,32 @@ import {
 } from 'firebase/storage';
 import { generateCredentials } from '../utils/authUtils';
 
-export default function useAdminActions({ 
-  appId, 
-  setSaveMessage, 
-  setGeneratedCreds, 
-  setEditingStudent, 
-  studentForm, 
-  setStudentForm, 
-  students, 
-  materials, 
-  materialForm, 
-  setMaterialForm, 
-  setEditingMaterial, 
+export default function useAdminActions({
+  appId,
+  setSaveMessage,
+  setGeneratedCreds,
+  setEditingStudent,
+  studentForm,
+  setStudentForm,
+  students,
+  materials,
+  materialForm,
+  setMaterialForm,
+  setEditingMaterial,
   editingMaterial,
-  announcementForm, 
-  setAnnouncementForm, 
+  announcementForm,
+  setAnnouncementForm,
   reflectionItemForm,
   setReflectionItemForm,
   editingReflectionItem,
   setEditingReflectionItem,
-  adminComment, 
-  setAdminComment, 
-  setIsUploadingMaterialUpload, 
-  setIsUploadingMaterialThumbnail 
+  adminComment,
+  setAdminComment,
+  setIsUploadingMaterialUpload,
+  setIsUploadingMaterialThumbnail
 }) {
+  // Tracks which admin comment record IDs are currently submitting (XP spam prevention)
+  const submittingComments = new Set();
 
   const saveStudent = async (e) => {
     e.preventDefault();
@@ -209,17 +211,18 @@ export default function useAdminActions({
 
   const submitAdminComment = async (recordId) => {
     const text = adminComment[recordId];
-    if (!text) return;
+    if (!text || submittingComments.has(recordId)) return;
+    submittingComments.add(recordId);
     try {
       const recordRef = doc(db, 'artifacts', appId, 'public', 'data', 'learning_records', recordId);
       const snap = await getDoc(recordRef);
       const data = snap.data();
-      
+
       const batch = writeBatch(db);
       batch.update(recordRef, { comment: text, commentAt: serverTimestamp(), commentPointed: true });
-      
-      // Also give student 1 point and 30XP
-      if (data.studentId) {
+
+      // Give student 1 point and 30XP only if not yet pointed
+      if (data.studentId && !data.commentPointed) {
         const sRef = doc(db, 'artifacts', appId, 'public', 'data', 'students', data.studentId);
         const sSnap = await getDoc(sRef);
         const sData = sSnap.exists() ? sSnap.data() : {};
@@ -228,19 +231,21 @@ export default function useAdminActions({
           xp: (sData.xp || 0) + 30
         });
       }
-      
+
       await batch.commit();
       setAdminComment(prev => {
         const next = { ...prev };
         delete next[recordId];
         return next;
       });
-      setSaveMessage('コメントとポイント(+1pt/30XP)を送信しました');
+      setSaveMessage(data.commentPointed ? 'コメントを更新しました' : 'コメントとポイント(+1pt/30XP)を送信しました');
     } catch (err) { setSaveMessage('失敗'); }
+    finally { submittingComments.delete(recordId); }
     setTimeout(() => setSaveMessage(''), 3000);
   };
 
   const approveCompletion = async (requestId, studentId, materialId) => {
+    if (!window.confirm('この完了申請を承認しますか？(+50XP付与)')) return;
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'completion_requests', requestId), {
         status: 'approved', approvedAt: serverTimestamp()

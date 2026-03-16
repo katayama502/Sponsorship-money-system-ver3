@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   LogOut,
   Calculator,
@@ -61,8 +61,38 @@ export default function StudentLayout({
   handleMaterialOpen,
   toggleMaterialComplete,
   completionRequests,
-  MATERIAL_CATEGORIES
+  MATERIAL_CATEGORIES,
+  isSendingMessage
 }) {
+  // --- Local state ---
+  const [isSubmittingComplete, setIsSubmittingComplete] = useState(false);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const prevLevelRef = useRef(null);
+
+  // Level-up detection
+  useEffect(() => {
+    const loggedInStudent = currentUser.role === 'student'
+      ? students.find(s => s.id === currentUser.studentId)
+      : students.find(s => s.id === currentUser.childId);
+    const studentXp = loggedInStudent?.xp || 0;
+    const { level } = (() => {
+      let lv = 1;
+      const XP_PER_LEVEL = 100;
+      let cumulative = 0;
+      const xpThresholds = [0,100,220,360,520,700,900,1120,1360,1620,1900,2200,2520,2860,3220,3600,4000,4420,4860,5320];
+      for (let i = 0; i < xpThresholds.length; i++) {
+        if (studentXp >= xpThresholds[i]) lv = i + 1; else break;
+      }
+      return { level: Math.min(lv, 20) };
+    })();
+    if (prevLevelRef.current !== null && level > prevLevelRef.current) {
+      setShowLevelUp(true);
+      const timer = setTimeout(() => setShowLevelUp(false), 4000);
+      return () => clearTimeout(timer);
+    }
+    prevLevelRef.current = level;
+  }, [students, currentUser]);
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans selection:bg-orange-100 selection:text-orange-900">
       {/* Navbar */}
@@ -70,6 +100,7 @@ export default function StudentLayout({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
+              aria-label="メニューをひらく"
               className="md:hidden p-2.5 -ml-2 text-slate-500 hover:bg-slate-100 rounded-2xl transition-all active:scale-90"
               onClick={() => setIsMobileMenuOpen(true)}
             >
@@ -86,7 +117,7 @@ export default function StudentLayout({
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="hidden md:flex gap-2 bg-slate-100/50 p-1.5 rounded-2xl">
+            <nav aria-label="メインナビゲーション" className="hidden md:flex gap-2 bg-slate-100/50 p-1.5 rounded-2xl overflow-x-auto flex-nowrap">
               <button
                 onClick={() => {
                   setActiveTab('mypage');
@@ -94,7 +125,8 @@ export default function StudentLayout({
                   setReadAnnouncementIds(allIds);
                   localStorage.setItem('readAnnouncements', JSON.stringify(allIds));
                 }}
-                className={`relative px-4 py-2 rounded-xl text-sm font-black transition-all ${activeTab === 'mypage' ? 'bg-orange-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}
+                aria-current={activeTab === 'mypage' ? 'page' : undefined}
+                className={`relative px-4 py-2 rounded-xl text-sm font-black transition-all whitespace-nowrap ${activeTab === 'mypage' ? 'bg-orange-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}
               >
                 マイページ
                 {announcements.filter(a => !readAnnouncementIds.includes(a.id)).length > 0 && (
@@ -103,40 +135,66 @@ export default function StudentLayout({
                   </span>
                 )}
               </button>
-              <button onClick={() => setActiveTab('materials')} className={`px-4 py-2 rounded-xl text-sm font-black transition-all ${activeTab === 'materials' ? 'bg-sky-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}>きょうざいを見る</button>
+              <button
+                onClick={() => setActiveTab('materials')}
+                aria-current={activeTab === 'materials' ? 'page' : undefined}
+                className={`px-4 py-2 rounded-xl text-sm font-black transition-all whitespace-nowrap ${activeTab === 'materials' ? 'bg-sky-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}
+              >きょうざいを見る</button>
               {currentUser.role === 'student' && (
-                <button onClick={() => setActiveTab('game')} className={`px-4 py-2 rounded-xl text-sm font-black transition-all ${activeTab === 'game' ? 'bg-violet-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}>🎮 ゲームで遊ぶ</button>
+                <button
+                  onClick={() => setActiveTab('game')}
+                  aria-current={activeTab === 'game' ? 'page' : undefined}
+                  className={`px-4 py-2 rounded-xl text-sm font-black transition-all whitespace-nowrap ${activeTab === 'game' ? 'bg-violet-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}
+                >🎮 ゲームで遊ぶ</button>
               )}
-              <button onClick={() => setActiveTab('growth')} className={`px-4 py-2 rounded-xl text-sm font-black transition-all ${activeTab === 'growth' ? 'bg-teal-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}>📚 成長の軌跡</button>
-            </div>
-            <button onClick={handleLogout} className="text-slate-400 hover:text-rose-500 transition-colors ml-2 bg-slate-100 p-2.5 rounded-full"><LogOut size={20} /></button>
+              <button
+                onClick={() => setActiveTab('growth')}
+                aria-current={activeTab === 'growth' ? 'page' : undefined}
+                className={`px-4 py-2 rounded-xl text-sm font-black transition-all whitespace-nowrap ${activeTab === 'growth' ? 'bg-teal-500 text-white shadow-md scale-105' : 'text-slate-500 hover:bg-white'}`}
+              >📚 成長の軌跡</button>
+            </nav>
+            <button aria-label="ログアウトする" onClick={handleLogout} className="text-slate-400 hover:text-rose-500 transition-colors ml-2 bg-slate-100 p-2.5 rounded-full"><LogOut size={20} /></button>
           </div>
         </div>
       </nav>
 
       {/* Mobile Menu Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 shadow-xl flex flex-col transition-transform duration-300 ease-in-out md:hidden ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside aria-label="モバイルナビゲーション" className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 shadow-xl flex flex-col transition-transform duration-300 ease-in-out md:hidden ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-20 flex items-center justify-between px-6 border-b border-slate-100">
           <span className="font-black text-xl tracking-tight text-slate-800 flex items-center gap-2"><div className="bg-orange-500 p-2 rounded-xl text-white shadow-sm transform -rotate-3"><Calculator size={20} /></div>クリエット！</span>
-          <button className="text-slate-400 hover:text-slate-600 bg-slate-50 p-2 rounded-xl" onClick={() => setIsMobileMenuOpen(false)}>
+          <button aria-label="メニューをとじる" className="text-slate-400 hover:text-slate-600 bg-slate-50 p-2 rounded-xl" onClick={() => setIsMobileMenuOpen(false)}>
             <X size={20} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
-          <button onClick={() => { setActiveTab('mypage'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'mypage' ? 'bg-orange-100 text-orange-600' : 'text-slate-500 hover:bg-slate-50'}`}>マイページ</button>
-          <button onClick={() => { setActiveTab('materials'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'materials' ? 'bg-sky-100 text-sky-600' : 'text-slate-500 hover:bg-slate-50'}`}>きょうざいを見る</button>
+        <nav aria-label="モバイルメインナビゲーション" className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
+          <button onClick={() => { setActiveTab('mypage'); setIsMobileMenuOpen(false); }} aria-current={activeTab === 'mypage' ? 'page' : undefined} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'mypage' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>マイページ</button>
+          <button onClick={() => { setActiveTab('materials'); setIsMobileMenuOpen(false); }} aria-current={activeTab === 'materials' ? 'page' : undefined} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'materials' ? 'bg-sky-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>きょうざいを見る</button>
           {currentUser.role === 'student' && (
-            <button onClick={() => { setActiveTab('game'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'game' ? 'bg-violet-100 text-violet-600' : 'text-slate-500 hover:bg-slate-50'}`}>🎮 ゲームで遊ぶ</button>
+            <button onClick={() => { setActiveTab('game'); setIsMobileMenuOpen(false); }} aria-current={activeTab === 'game' ? 'page' : undefined} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'game' ? 'bg-violet-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>🎮 ゲームで遊ぶ</button>
           )}
-          <button onClick={() => { setActiveTab('growth'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'growth' ? 'bg-teal-100 text-teal-600' : 'text-slate-500 hover:bg-slate-50'}`}>📚 成長の軌跡</button>
-        </div>
+          <button onClick={() => { setActiveTab('growth'); setIsMobileMenuOpen(false); }} aria-current={activeTab === 'growth' ? 'page' : undefined} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'growth' ? 'bg-teal-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>📚 成長の軌跡</button>
+        </nav>
         <div className="p-4 border-t border-slate-100">
           <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-sm font-black hover:bg-slate-50 text-rose-500 rounded-xl transition-all"><LogOut size={18} /> ログアウト</button>
         </div>
       </aside>
 
       <main className="flex-grow max-w-4xl w-full mx-auto p-4 md:p-6 space-y-8 text-left text-slate-900">
-        {saveMessage && <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce text-left"><CheckCircle2 size={18} className="text-emerald-400" /><span className="text-sm font-bold">{saveMessage}</span></div>}
+        {/* Level-up celebration overlay */}
+        {showLevelUp && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in duration-300"
+            onClick={() => setShowLevelUp(false)}
+          >
+            <div className="bg-white rounded-3xl p-10 text-center shadow-2xl animate-in zoom-in duration-500">
+              <div className="text-6xl mb-4">🎉</div>
+              <h2 className="text-3xl font-black text-orange-500">レベルアップ！</h2>
+              <p className="text-slate-600 font-bold mt-2">クリックでとじる</p>
+            </div>
+          </div>
+        )}
+
+        {saveMessage && <div role="alert" className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce text-left"><CheckCircle2 size={18} className="text-emerald-400" /><span className="text-sm font-bold">{saveMessage}</span></div>}
 
         {/* 受講生・保護者向け: マイページ */}
         {(currentUser.role === 'student' || currentUser.role === 'parent') && activeTab === 'mypage' && (
@@ -174,6 +232,81 @@ export default function StudentLayout({
                 <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xl flex flex-col justify-center"><p className="text-[10px] font-black text-slate-400 uppercase mb-1 flex items-center gap-1.5 tracking-widest"><Clock size={12} className="text-orange-500" /> つぎのじゅぎょう</p><p className="text-xl font-black text-slate-800 whitespace-nowrap">{currentUser.nextClassDate || 'まだ設定されていないよ'}</p></div>
               </div>
             </header>
+
+            {/* つぎにやること (Next action hint) */}
+            {currentUser.role === 'student' && (() => {
+              const studentIdHint = currentUser.studentId;
+              const hasPending = completionRequests.some(r => r.studentId === studentIdHint && r.status === 'pending');
+              const hasUnreadAnnouncements = announcements.some(a => !readAnnouncementIds.includes(a.id));
+              let hintBg = 'bg-emerald-50 border-emerald-200';
+              let hintIcon = '🌟';
+              let hintText = 'きょうもがんばろう！今日もクリエットで楽しく学ぼうね！';
+              if (hasPending) {
+                hintBg = 'bg-amber-50 border-amber-200';
+                hintIcon = '⏳';
+                hintText = '先生がかくにんちゅうだよ！もうすぐ結果がわかるよ！';
+              } else if (hasUnreadAnnouncements) {
+                hintBg = 'bg-sky-50 border-sky-200';
+                hintIcon = '📢';
+                hintText = 'あたらしいお知らせがあるよ！チェックしてみよう！';
+              }
+              return (
+                <div className={`rounded-2xl border p-5 flex items-center gap-4 ${hintBg}`}>
+                  <span className="text-3xl">{hintIcon}</span>
+                  <div>
+                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-0.5">つぎにやること</p>
+                    <p className="font-black text-slate-800">{hintText}</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Parent progress summary */}
+            {currentUser.role === 'parent' && (() => {
+              const childData = students.find(s => s.id === currentUser.childId);
+              if (!childData) return null;
+              const childXp = childData.xp || 0;
+              const { level } = getXpInfo(childXp);
+              const completedCount = childData.completedMaterials?.length || 0;
+              const recentRecords = learningRecords
+                .filter(r => r.studentId === currentUser.childId)
+                .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+                .slice(0, 3);
+              return (
+                <div className="bg-white rounded-[2rem] border border-slate-200 shadow-lg p-6 md:p-8">
+                  <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">📊 {childData.name}さんのせいちょう</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                    {[
+                      { label: 'レベル', value: `Lv.${level}`, icon: '⭐' },
+                      { label: '合計XP', value: `${childXp.toLocaleString()} XP`, icon: '⚡' },
+                      { label: 'クリア数', value: `${completedCount}教材`, icon: '🎯' },
+                      { label: 'きろく数', value: `${learningRecords.filter(r => r.studentId === currentUser.childId).length}件`, icon: '📝' },
+                    ].map(({ label, value, icon }) => (
+                      <div key={label} className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100">
+                        <div className="text-2xl mb-1">{icon}</div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+                        <p className="text-lg font-black text-slate-800">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {recentRecords.length > 0 && (
+                    <div>
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">さいきんのきろく</p>
+                      <div className="space-y-2">
+                        {recentRecords.map(r => (
+                          <div key={r.id} className="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-3 border border-slate-100">
+                            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${r.recordType === 'goal' ? 'bg-emerald-500 text-white' : 'bg-orange-500 text-white'}`}>
+                              {r.recordType === 'goal' ? '🎯 もくひょう' : '📝 ふりかえり'}
+                            </span>
+                            <p className="text-sm font-bold text-slate-700 truncate">{r.title}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* --- キャラクターとXPステータスバー --- */}
             {(() => {
@@ -310,7 +443,7 @@ export default function StudentLayout({
                   </div>
 
                   {/* ★ Gacha System & Equipment Setup ★ */}
-                  <div className="mt-8 space-y-8">
+                  <div className="mt-8 space-y-8" data-gacha-section>
                     <GachaSystem
                       points={points}
                       onRoll={async (pulledItem) => {
@@ -343,7 +476,9 @@ export default function StudentLayout({
                                     {eqItem.stats.def !== 0 && <span>DEF {eqItem.stats.def > 0 ? '+' : ''}{eqItem.stats.def}</span>}
                                   </div>
                                   <button
+                                    aria-label={`${type === 'weapon' ? 'ぶき' : type === 'armor' ? 'よろい' : 'アクセサリー'}をはずす`}
                                     onClick={async () => {
+                                      if (!window.confirm('そうびをはずしますか？')) return;
                                       const newEquipped = { ...equipped, [type]: null };
                                       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', currentUser.studentId), { equipped: newEquipped });
                                     }}
@@ -361,7 +496,16 @@ export default function StudentLayout({
                       <div className="border-t border-slate-100 pt-6">
                         <h4 className="text-sm font-black text-slate-600 mb-4 text-left">もちもの</h4>
                         {inventory.length === 0 ? (
-                          <p className="text-sm text-slate-400 text-center py-8">ガチャをまわして、そうびをてにいれよう！</p>
+                          <div className="text-center py-8">
+                            <p className="text-sm font-black text-slate-500 mb-3">まだそうびがないよ！ガチャをまわしてそうびをゲットしよう！✨</p>
+                            <button
+                              onClick={() => {
+                                const gachaEl = document.querySelector('[data-gacha-section]');
+                                if (gachaEl) gachaEl.scrollIntoView({ behavior: 'smooth' });
+                              }}
+                              className="bg-orange-500 text-white font-black text-sm px-5 py-2.5 rounded-xl shadow-md hover:bg-orange-600 transition-colors active:scale-95"
+                            >ガチャをまわす ✨</button>
+                          </div>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-2">
                             {Object.values(inventory.reduce((acc, itemId) => {
@@ -435,6 +579,33 @@ export default function StudentLayout({
                 </div>
               );
             })()}
+
+            {/* お知らせセクション */}
+            <div className="bg-white rounded-[2rem] border border-slate-200 shadow-lg p-6 md:p-8">
+              <h3 className="text-lg font-black text-slate-800 flex items-center gap-2 mb-4">📢 お知らせ</h3>
+              {announcements.length === 0 ? (
+                <p role="alert" className="text-sm text-slate-400 text-center py-6 font-medium">まだお知らせはありません</p>
+              ) : (
+                <div className="space-y-3">
+                  {announcements.slice().reverse().map(a => {
+                    const isUnread = !readAnnouncementIds.includes(a.id);
+                    return (
+                      <div key={a.id} className={`rounded-2xl px-5 py-4 border flex items-start gap-3 ${isUnread ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-100'}`}>
+                        {isUnread && <span className="shrink-0 w-2 h-2 rounded-full bg-orange-500 mt-1.5" />}
+                        <div className="flex-1">
+                          <p className={`text-sm font-bold ${isUnread ? 'text-slate-800' : 'text-slate-500'}`}>{a.content || a.title || a.message || JSON.stringify(a)}</p>
+                          {a.createdAt && (
+                            <p className="text-[10px] font-bold text-slate-400 mt-1">
+                              {new Date(a.createdAt.seconds ? a.createdAt.seconds * 1000 : a.createdAt).toLocaleDateString('ja-JP')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {currentUser.role === 'student' && (
               <div className="bg-white rounded-[2rem] border border-slate-200 shadow-lg p-8 md:p-12">
@@ -537,8 +708,8 @@ export default function StudentLayout({
                           </div>
                         </div>
                         <div className="flex gap-2 shrink-0">
-                          <a href={file.downloadUrl} download={file.fileName} className="p-2.5 bg-white border border-slate-200 text-slate-400 hover:text-orange-600 rounded-xl transition-colors" title="ダウンロード"><Download size={16} /></a>
-                          <button onClick={() => deleteSb3File(file)} className="p-2.5 bg-white border border-slate-200 text-slate-400 hover:text-rose-500 rounded-xl transition-colors" title="削除"><Trash2 size={16} /></button>
+                          <a href={file.downloadUrl} download={file.fileName} aria-label={`${file.fileName}をダウンロード`} className="p-2.5 bg-white border border-slate-200 text-slate-400 hover:text-orange-600 rounded-xl transition-colors" title="ダウンロード"><Download size={16} /></a>
+                          <button onClick={() => deleteSb3File(file)} aria-label={`${file.fileName}をさくじょ`} className="p-2.5 bg-white border border-slate-200 text-slate-400 hover:text-rose-500 rounded-xl transition-colors" title="削除"><Trash2 size={16} /></button>
                         </div>
                       </div>
                     ))}
@@ -572,7 +743,12 @@ export default function StudentLayout({
                     </div>
                     <form onSubmit={(e) => sendMessage(e, 'admin', studentIdContext)} className="flex gap-3 shrink-0 pt-4 border-t border-slate-100">
                       <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="メッセージを入力..." className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-orange-500" />
-                      <button type="submit" className="bg-slate-900 text-white px-6 rounded-xl font-black text-sm tracking-widest uppercase hover:bg-orange-600 transition-colors shadow-md">送信</button>
+                      <button
+                        type="submit"
+                        aria-label="メッセージを送信する"
+                        disabled={isSendingMessage}
+                        className={`px-6 rounded-xl font-black text-sm tracking-widest uppercase shadow-md transition-colors ${isSendingMessage ? 'bg-slate-300 text-slate-400 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-orange-600'}`}
+                      >送信</button>
                     </form>
                   </div>
                 </div>
@@ -866,12 +1042,21 @@ export default function StudentLayout({
                                   <>
                                     {hasRejected && <p className="text-[10px] text-rose-500 font-bold mb-1 text-center animate-pulse">せんせいからおくりかえされたよ。もういちどやってみよう！</p>}
                                     <button
-                                      onClick={(e) => { if (!buttonState.disabled) toggleMaterialComplete(e, m.id) }}
-                                      disabled={buttonState.disabled}
-                                      className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest transition-all duration-300 ${buttonState.bg}`}
+                                      onClick={async (e) => {
+                                        if (buttonState.disabled || isSubmittingComplete) return;
+                                        setIsSubmittingComplete(true);
+                                        try {
+                                          await toggleMaterialComplete(e, m.id);
+                                        } finally {
+                                          setIsSubmittingComplete(false);
+                                        }
+                                      }}
+                                      disabled={buttonState.disabled || isSubmittingComplete}
+                                      aria-label={buttonState.text}
+                                      className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-black uppercase tracking-widest transition-all duration-300 ${buttonState.bg} ${isSubmittingComplete ? 'opacity-60 cursor-not-allowed' : ''}`}
                                     >
                                       {buttonState.icon}
-                                      {buttonState.text}
+                                      {isSubmittingComplete ? 'おくりちゅう...' : buttonState.text}
                                     </button>
                                   </>
                                 );

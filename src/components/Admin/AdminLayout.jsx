@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Users,
   FileText,
@@ -21,7 +21,8 @@ import {
   Link as LinkIcon,
   MessageSquare,
   Key,
-  FileArchive
+  FileArchive,
+  Check
 } from 'lucide-react';
 
 import { getMaterialThumbnail } from '../../utils/materialUtils';
@@ -81,8 +82,19 @@ export default function AdminLayout({
   newMessage,
   setNewMessage,
   sendMessage,
+  isSendingMessage,
   sb3Files
 }) {
+  const [copiedField, setCopiedField] = useState(null);
+  const [materialCategoryFilter, setMaterialCategoryFilter] = useState('all');
+
+  const copyToClipboard = (text, fieldKey) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedField(fieldKey);
+      setTimeout(() => setCopiedField(null), 2000);
+    });
+  };
+
   return (
     <div className="flex h-screen overflow-hidden relative">
       {/* Mobile Overlay */}
@@ -160,11 +172,11 @@ export default function AdminLayout({
           </div>
         </header>
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
-          {saveMessage && <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce text-left"><CheckCircle2 size={18} className="text-emerald-400" /><span className="text-sm font-bold">{saveMessage}</span></div>}
+          {saveMessage && <div role="alert" className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce text-left"><CheckCircle2 size={18} className="text-emerald-400" /><span className="text-sm font-bold">{saveMessage}</span></div>}
 
           {/* 容量アラートポップアップ */}
           {storageUsage.isWarning && (
-            <div className="mb-6 bg-rose-50 border-l-4 border-rose-500 p-4 rounded-r-2xl shadow-sm animate-in slide-in-from-top-4 duration-500 relative flex items-start gap-3">
+            <div role="alert" className="mb-6 bg-rose-50 border-l-4 border-rose-500 p-4 rounded-r-2xl shadow-sm animate-in slide-in-from-top-4 duration-500 relative flex items-start gap-3">
                <AlertTriangle className="text-rose-500 shrink-0 mt-0.5" size={20} />
                <div>
                  <h3 className="text-sm font-black text-rose-800">【警告】ストレージ容量が上限に近づいています</h3>
@@ -235,12 +247,59 @@ export default function AdminLayout({
                 <h2 className="text-2xl font-black tracking-tight text-left">受講生・保護者管理</h2>
                 <button onClick={createTestAccount} className="bg-amber-100 hover:bg-amber-200 text-amber-600 px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 border border-amber-300 shadow-sm transition-all"><Sparkles size={14}/> ガチャテスト用アカウント作成 (10000pt)</button>
               </header>
+
+              {/* クイックアクション */}
+              <div className="bg-white rounded-3xl border border-slate-200 p-5 shadow-sm">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">クイックアクション</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100">
+                    <p className="text-3xl font-black text-orange-500">{(students || []).length}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">登録生徒数</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100">
+                    <p className="text-3xl font-black text-rose-500">{(completionRequests || []).filter(r => r.status === 'pending').length}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">承認待ち</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100">
+                    <p className="text-3xl font-black text-emerald-500">{(learningRecords || []).filter(r => !r.comment).length}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">未コメント</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100">
+                    <p className="text-3xl font-black text-slate-600">{(students || []).filter(s => { const m = (messages || []).filter(msg => msg.studentId === s.id); return m.length > 0 && m[m.length - 1].senderId !== 'admin'; }).length}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">新着メッセージ</p>
+                  </div>
+                </div>
+              </div>
               {generatedCreds && (
                 <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-2xl space-y-4 border-2 border-orange-500 animate-in zoom-in-95 duration-300 text-left">
                   <div className="flex items-center gap-3 text-orange-400 font-bold text-left"><Key size={20} /> <span className="text-left">アカウントを発行しました: {generatedCreds.name}様</span></div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left font-mono">
-                    <div className="bg-white/10 p-4 rounded-2xl text-left"><p className="text-[10px] font-bold text-orange-300 mb-2 uppercase text-left">受講生用</p><p className="text-sm text-left tracking-widest">ID: {generatedCreds.student.id} / PW: {generatedCreds.student.pw}</p></div>
-                    <div className="bg-white/10 p-4 rounded-2xl text-left"><p className="text-[10px] font-bold text-orange-300 mb-2 uppercase text-left">保護者用</p><p className="text-sm text-left tracking-widest">ID: {generatedCreds.parent.id} / PW: {generatedCreds.parent.pw}</p></div>
+                    <div className="bg-white/10 p-4 rounded-2xl text-left">
+                      <div className="flex justify-between items-center mb-2">
+                        <p className="text-[10px] font-bold text-orange-300 uppercase text-left">受講生用</p>
+                        <button
+                          aria-label="受講生のIDとパスワードをコピー"
+                          onClick={() => copyToClipboard(`ID: ${generatedCreds.student.id} / PW: ${generatedCreds.student.pw}`, 'student-creds')}
+                          className="text-[9px] bg-white/20 hover:bg-white/30 px-2 py-1 rounded font-black text-orange-200 uppercase tracking-widest flex items-center gap-1 transition-colors"
+                        >
+                          {copiedField === 'student-creds' ? <><Check size={10} className="text-emerald-400" /> コピー済</> : 'コピー'}
+                        </button>
+                      </div>
+                      <p className="text-sm text-left tracking-widest">ID: {generatedCreds.student.id} / PW: {generatedCreds.student.pw}</p>
+                    </div>
+                    <div className="bg-white/10 p-4 rounded-2xl text-left">
+                      <div className="flex justify-between items-center mb-2">
+                        <p className="text-[10px] font-bold text-orange-300 uppercase text-left">保護者用</p>
+                        <button
+                          aria-label="保護者のIDとパスワードをコピー"
+                          onClick={() => copyToClipboard(`ID: ${generatedCreds.parent.id} / PW: ${generatedCreds.parent.pw}`, 'parent-creds')}
+                          className="text-[9px] bg-white/20 hover:bg-white/30 px-2 py-1 rounded font-black text-orange-200 uppercase tracking-widest flex items-center gap-1 transition-colors"
+                        >
+                          {copiedField === 'parent-creds' ? <><Check size={10} className="text-emerald-400" /> コピー済</> : 'コピー'}
+                        </button>
+                      </div>
+                      <p className="text-sm text-left tracking-widest">ID: {generatedCreds.parent.id} / PW: {generatedCreds.parent.pw}</p>
+                    </div>
                   </div>
                   <button onClick={() => setGeneratedCreds(null)} className="w-full bg-orange-600 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-orange-700 transition-colors">内容を確認して閉じる</button>
                 </div>
@@ -249,7 +308,7 @@ export default function AdminLayout({
                 <div className="xl:col-span-1 bg-white rounded-3xl border border-slate-200 p-6 shadow-sm text-left">
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 text-left">{editingStudent ? '生徒編集' : '生徒登録'}</h3>
                   <form onSubmit={saveStudent} className="space-y-5 text-left">
-                    <div><label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1 text-left">氏名</label><input type="text" required value={studentForm.name} onChange={e => setStudentForm({ ...studentForm, name: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-left" /></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1 text-left">氏名</label><input type="text" required aria-required="true" aria-label="氏名" value={studentForm.name} onChange={e => setStudentForm({ ...studentForm, name: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-left" /></div>
                     <div className="grid grid-cols-2 gap-4 text-left">
                       <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 text-left">学校</label><input type="text" value={studentForm.school} onChange={e => setStudentForm({ ...studentForm, school: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-left" /></div>
                       <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 text-left">年齢</label><input type="number" value={studentForm.age} onChange={e => setStudentForm({ ...studentForm, age: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-left" /></div>
@@ -309,21 +368,31 @@ export default function AdminLayout({
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"><Users size={16} /></span>
                     {studentSearchQuery && <button onClick={() => setStudentSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"><X size={14} /></button>}
                   </div>
+                  {(students || []).filter(s => !studentSearchQuery || s.name?.includes(studentSearchQuery) || s.school?.includes(studentSearchQuery)).length === 0 && (
+                    <div className="py-20 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
+                      <Users size={48} className="mx-auto text-slate-300 mb-4" />
+                      <p className="text-slate-500 font-bold">まだ生徒がいません。「受講生を登録する」ボタンで追加しましょう！</p>
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {(students || []).filter(s => !studentSearchQuery || s.name?.includes(studentSearchQuery) || s.school?.includes(studentSearchQuery)).map(s => {
                     const studentMsgs = (messages || []).filter(m => m.studentId === s.id);
                     const hasUnread = studentMsgs.length > 0 && studentMsgs[studentMsgs.length - 1].senderId !== 'admin';
+                    const lastLoginDisplay = s.lastLoginAt
+                      ? '最終ログイン: ' + s.lastLoginAt.toDate().toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+                      : '未ログイン';
 
                     return (
                       <div key={s.id} className="bg-white p-6 rounded-3xl border border-slate-200 flex flex-col justify-between shadow-sm relative group hover:border-orange-300 transition-all text-left">
                         <div className="absolute top-0 right-0 p-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-all text-left">
-                          <button onClick={() => { setEditingStudent(s); setStudentForm(s); window.scrollTo(0, 0); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 rounded-lg"><Edit2 size={14} /></button>
-                          <button onClick={() => deleteStudentCascade(s.id)} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 rounded-lg"><Trash2 size={14} /></button>
+                          <button aria-label={`${s.name}を編集`} onClick={() => { setEditingStudent(s); setStudentForm(s); window.scrollTo(0, 0); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 rounded-lg"><Edit2 size={14} /></button>
+                          <button aria-label={`${s.name}を削除`} onClick={() => deleteStudentCascade(s.id)} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 rounded-lg"><Trash2 size={14} /></button>
                         </div>
                         <div className="text-left flex items-start justify-between">
                           <div>
                             <h4 className="font-black text-xl text-slate-800 text-left">{s.name}</h4>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left mt-1">{s.school || '学校未登録'} | {s.age || '?'}歳</p>
+                            <p className="text-[10px] font-bold text-slate-300 text-left mt-0.5">{lastLoginDisplay}</p>
                           </div>
                           {hasUnread && <div className="bg-rose-100 text-rose-600 text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-widest flex items-center gap-1 shadow-sm mt-1 animate-pulse"><MessageSquare size={10} /> 新着</div>}
                         </div>
@@ -411,7 +480,7 @@ export default function AdminLayout({
                        </div>
                        <form onSubmit={(e) => sendMessage(e, s.id, s.id)} className="flex gap-2 shrink-0">
                           <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="メッセージを入力..." className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-500" />
-                          <button type="submit" className="bg-slate-900 text-white px-4 rounded-xl font-bold text-sm tracking-wider uppercase hover:bg-orange-600 transition-colors">送信</button>
+                          <button type="submit" disabled={isSendingMessage} className="bg-slate-900 text-white px-4 rounded-xl font-bold text-sm tracking-wider uppercase hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">{isSendingMessage ? <Loader2 size={16} className="animate-spin" /> : '送信'}</button>
                        </form>
                     </div>
 
@@ -517,21 +586,49 @@ export default function AdminLayout({
                   </form>
                 </div>
                 <div className="md:col-span-2 space-y-4 text-left">
-                  {materials.map(m => (
-                    <div key={m.id} className={`bg-white p-6 rounded-3xl border ${m.isPublished === false ? 'border-dashed border-slate-300 opacity-60' : 'border-slate-200'} flex justify-between items-start group shadow-sm text-left hover:border-orange-200 transition-all`}>
-                      <div className="flex gap-4">
-                        <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 relative">
-                           {m.isPublished === false && <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center"><span className="text-[9px] font-black text-white bg-slate-900 px-2 py-0.5 rounded-full uppercase tracking-widest">非公開</span></div>}
-                           <img src={m.thumbnailUrl || getMaterialThumbnail(m.category)} alt="" className="w-full h-full object-cover" />
+                  {(() => {
+                    const categories = ['all', ...Array.from(new Set((materials || []).map(m => m.category).filter(Boolean)))];
+                    const filtered = materialCategoryFilter === 'all' ? (materials || []) : (materials || []).filter(m => m.category === materialCategoryFilter);
+                    return (
+                      <>
+                        <div className="flex flex-wrap gap-2">
+                          {categories.map(cat => {
+                            const count = cat === 'all' ? (materials || []).length : (materials || []).filter(m => m.category === cat).length;
+                            return (
+                              <button
+                                key={cat}
+                                onClick={() => setMaterialCategoryFilter(cat)}
+                                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors border ${materialCategoryFilter === cat ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-slate-500 border-slate-200 hover:border-orange-300 hover:text-orange-600'}`}
+                              >
+                                {cat === 'all' ? 'すべて' : cat} ({count}件)
+                              </button>
+                            );
+                          })}
                         </div>
-                        <div className="text-left"><h4 className="font-black text-slate-800 text-lg text-left break-all">{m.title}</h4><div className="flex flex-wrap gap-2 mt-2 text-left"><span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter text-left">{m.category}</span>{m.downloadUrl && <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center gap-1"><Download size={9} /> DLあり</span>}</div><a href={m.url} target="_blank" className="text-orange-600 text-xs font-black flex items-center gap-1 mt-4 hover:underline text-left uppercase truncate max-w-full">Open <LinkIcon size={12} /></a></div>
-                      </div>
-                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all text-left">
-                        <button onClick={() => { setEditingMaterial(m); setMaterialForm({ ...m, category: m.category || 'scratch', thumbnailUrl: m.thumbnailUrl || '', downloadUrl: m.downloadUrl || '', isPublished: m.isPublished !== false }); window.scrollTo(0,0); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 transition-colors"><Edit2 size={14} /></button>
-                        <button onClick={() => deleteMaterial(m.id)} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={14} /></button>
-                      </div>
-                    </div>
-                  ))}
+                        {filtered.length === 0 && (
+                          <div className="py-20 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
+                            <BookOpen size={48} className="mx-auto text-slate-300 mb-4" />
+                            <p className="text-slate-500 font-bold">まだ教材がありません</p>
+                          </div>
+                        )}
+                        {filtered.map(m => (
+                          <div key={m.id} className={`bg-white p-6 rounded-3xl border ${m.isPublished === false ? 'border-dashed border-slate-300 opacity-60' : 'border-slate-200'} flex justify-between items-start group shadow-sm text-left hover:border-orange-200 transition-all`}>
+                            <div className="flex gap-4">
+                              <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 relative">
+                                 {m.isPublished === false && <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center"><span className="text-[9px] font-black text-white bg-slate-900 px-2 py-0.5 rounded-full uppercase tracking-widest">非公開</span></div>}
+                                 <img src={m.thumbnailUrl || getMaterialThumbnail(m.category)} alt="" className="w-full h-full object-cover" />
+                              </div>
+                              <div className="text-left"><h4 className="font-black text-slate-800 text-lg text-left break-all">{m.title}</h4><div className="flex flex-wrap gap-2 mt-2 text-left"><span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter text-left">{m.category}</span>{m.downloadUrl && <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center gap-1"><Download size={9} /> DLあり</span>}</div><a href={m.url} target="_blank" className="text-orange-600 text-xs font-black flex items-center gap-1 mt-4 hover:underline text-left uppercase truncate max-w-full">Open <LinkIcon size={12} /></a></div>
+                            </div>
+                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all text-left">
+                              <button aria-label={`${m.title}を編集`} onClick={() => { setEditingMaterial(m); setMaterialForm({ ...m, category: m.category || 'scratch', thumbnailUrl: m.thumbnailUrl || '', downloadUrl: m.downloadUrl || '', isPublished: m.isPublished !== false }); window.scrollTo(0,0); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 transition-colors"><Edit2 size={14} /></button>
+                              <button aria-label={`${m.title}を削除`} onClick={() => deleteMaterial(m.id)} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={14} /></button>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -542,8 +639,36 @@ export default function AdminLayout({
             <div className="space-y-8 animate-in fade-in duration-500 text-left">
               <header className="text-left font-black text-2xl text-left text-slate-800">全体連絡管理</header>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
-                <div className="md:col-span-1 bg-white p-6 rounded-3xl border border-slate-200 h-fit shadow-sm text-left"><h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 text-left">新規投稿</h3><form onSubmit={postAnnouncement} className="space-y-4 text-left"><input type="text" required placeholder="タイトル" value={announcementForm.title} onChange={e => setAnnouncementForm({ ...announcementForm, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" /><textarea required placeholder="本文" value={announcementForm.content} onChange={e => setAnnouncementForm({ ...announcementForm, content: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm h-32 resize-none text-left focus:ring-2 focus:ring-orange-500 outline-none" /><select value={announcementForm.type} onChange={e => setAnnouncementForm({ ...announcementForm, type: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none appearance-none text-left"><option value="info">通常のお知らせ</option><option value="emergency">緊急・重要連絡</option></select><button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg hover:bg-orange-600 transition-all uppercase tracking-[0.2em] text-sm">POST</button></form></div>
-                <div className="md:col-span-2 space-y-4 text-left">{announcements.map(notice => (<div key={notice.id} className="bg-white p-6 rounded-[2rem] border border-slate-200 flex justify-between items-start group shadow-sm text-left transition-all hover:border-orange-200"><div><div className="flex items-center gap-3 mb-2 text-left"><span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest text-left ${notice.type === 'emergency' ? 'bg-rose-100 text-rose-600' : 'bg-orange-100 text-orange-600'}`}>{notice.type}</span><span className="text-[10px] font-bold text-slate-400 text-left">{notice.createdAt?.toDate().toLocaleDateString()}</span></div><h4 className="font-black text-lg text-left text-slate-800">{notice.title}</h4><p className="text-sm text-slate-500 mt-2 leading-relaxed text-left">{notice.content}</p></div><button onClick={() => {/* Pass delete logic */}} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all shrink-0 text-left"><Trash2 size={18} /></button></div>))}</div>
+                <div className="md:col-span-1 bg-white p-6 rounded-3xl border border-slate-200 h-fit shadow-sm text-left">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 text-left">新規投稿</h3>
+                  <form onSubmit={postAnnouncement} className="space-y-4 text-left">
+                    <input type="text" required aria-required="true" aria-label="タイトル" placeholder="タイトル" value={announcementForm.title} onChange={e => setAnnouncementForm({ ...announcementForm, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" />
+                    <textarea required aria-required="true" aria-label="本文" placeholder="本文" value={announcementForm.content} onChange={e => setAnnouncementForm({ ...announcementForm, content: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm h-32 resize-none text-left focus:ring-2 focus:ring-orange-500 outline-none" />
+                    <select value={announcementForm.type} onChange={e => setAnnouncementForm({ ...announcementForm, type: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none appearance-none text-left"><option value="info">通常のお知らせ</option><option value="emergency">緊急・重要連絡</option></select>
+                    <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg hover:bg-orange-600 transition-all uppercase tracking-[0.2em] text-sm">POST</button>
+                  </form>
+                </div>
+                <div className="md:col-span-2 space-y-4 text-left">
+                  {(announcements || []).length === 0 && (
+                    <div className="py-20 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
+                      <Megaphone size={48} className="mx-auto text-slate-300 mb-4" />
+                      <p className="text-slate-500 font-bold">まだお知らせはありません</p>
+                    </div>
+                  )}
+                  {(announcements || []).map(notice => (
+                    <div key={notice.id} className="bg-white p-6 rounded-[2rem] border border-slate-200 flex justify-between items-start group shadow-sm text-left transition-all hover:border-orange-200">
+                      <div>
+                        <div className="flex items-center gap-3 mb-2 text-left">
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest text-left ${notice.type === 'emergency' ? 'bg-rose-100 text-rose-600' : 'bg-orange-100 text-orange-600'}`}>{notice.type}</span>
+                          <span className="text-[10px] font-bold text-slate-400 text-left">{notice.createdAt?.toDate().toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <h4 className="font-black text-lg text-left text-slate-800">{notice.title}</h4>
+                        <p className="text-sm text-slate-500 mt-2 leading-relaxed text-left">{notice.content}</p>
+                      </div>
+                      <button aria-label={`「${notice.title}」を削除`} onClick={() => {/* Pass delete logic */}} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all shrink-0 text-left"><Trash2 size={18} /></button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}

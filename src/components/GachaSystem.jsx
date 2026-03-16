@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { PackageOpen, Sparkles, Coins } from 'lucide-react';
+import { PackageOpen, Sparkles, Coins, History, ChevronDown, ChevronUp } from 'lucide-react';
 import { rollGacha, RARITY_RATES } from '../data/items';
+
+const MAX_HISTORY = 20;
 
 export default function GachaSystem({ points, onRoll }) {
   const [isRolling, setIsRolling] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [playingVideo, setPlayingVideo] = useState(null);
+  const [gachaHistory, setGachaHistory] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('gachaHistory') || '[]'); } catch { return []; }
+  });
+  const [showHistory, setShowHistory] = useState(false);
 
   // Preload gacha videos
   useEffect(() => {
@@ -27,14 +33,24 @@ export default function GachaSystem({ points, onRoll }) {
       setTimeout(() => setError(''), 3000);
       return;
     }
-    
+
+    if (!window.confirm('10ポイントをつかってガチャをまわしますか？')) return;
+
     setIsRolling(true);
     setResult(null);
     setError('');
 
     const pulledItem = rollGacha();
     await onRoll(pulledItem); // Deduct points and save to inventory
-    
+
+    // Save to local history
+    const entry = { ...pulledItem, rolledAt: new Date().toISOString() };
+    setGachaHistory(prev => {
+      const updated = [entry, ...prev].slice(0, MAX_HISTORY);
+      try { localStorage.setItem('gachaHistory', JSON.stringify(updated)); } catch (_) {}
+      return updated;
+    });
+
     const videoMap = {
       'C': '/video/1.mp4',
       'B': '/video/2.mp4',
@@ -42,7 +58,7 @@ export default function GachaSystem({ points, onRoll }) {
       'S': '/video/4.mp4',
       'SS': '/video/5.mp4',
     };
-    
+
     setPlayingVideo({ url: videoMap[pulledItem.rarity], item: pulledItem });
   };
 
@@ -55,9 +71,9 @@ export default function GachaSystem({ points, onRoll }) {
   const currentRarityStyle = RARITY_RATES.find(r => r.rarity === result?.rarity);
 
   return (
-    <div className="bg-white rounded-[2rem] border border-slate-200 p-8 shadow-sm">
+    <div className="bg-white rounded-[2rem] border border-slate-200 p-8 shadow-sm space-y-6">
       <div className="flex flex-col md:flex-row gap-8 items-center md:items-start text-left">
-        
+
         {/* Left: Gacha actions */}
         <div className="flex-1 space-y-6 w-full text-center md:text-left">
           <header>
@@ -80,6 +96,7 @@ export default function GachaSystem({ points, onRoll }) {
             <button
               onClick={handleRoll}
               disabled={isRolling || points < 10}
+              aria-label="ガチャを1回まわす（10ポイント消費）"
               className={`w-full max-w-sm py-4 rounded-xl flex items-center justify-center gap-2 text-lg font-black tracking-widest transition-all ${
                 isRolling ? 'bg-slate-200 text-slate-400 cursor-not-allowed' :
                 points < 10 ? 'bg-slate-100 text-slate-300 cursor-not-allowed' :
@@ -89,7 +106,7 @@ export default function GachaSystem({ points, onRoll }) {
               <Sparkles size={24} className={isRolling ? 'animate-spin' : 'animate-pulse'} />
               {isRolling ? 'ガチャをまわしているよ...' : '1かい 10ポイントでまわす'}
             </button>
-            {error && <p className="text-rose-500 font-bold text-sm mt-3 animate-bounce">{error}</p>}
+            {error && <p className="text-rose-500 font-bold text-sm mt-3 animate-bounce" role="alert">{error}</p>}
           </div>
 
           {/* Probability Table */}
@@ -104,26 +121,55 @@ export default function GachaSystem({ points, onRoll }) {
               ))}
             </div>
           </div>
+
+          {/* Gacha History */}
+          {gachaHistory.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden text-xs">
+              <button
+                onClick={() => setShowHistory(v => !v)}
+                className="w-full flex items-center justify-between p-3 bg-slate-50 border-b font-black text-slate-600 hover:bg-slate-100 transition-colors"
+                aria-expanded={showHistory}
+                aria-label="ガチャ履歴を表示・非表示"
+              >
+                <span className="flex items-center gap-2"><History size={14} /> ガチャ履歴（さいきんの{gachaHistory.length}かい）</span>
+                {showHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+              {showHistory && (
+                <div className="divide-y max-h-48 overflow-y-auto">
+                  {gachaHistory.map((h, i) => {
+                    const rs = RARITY_RATES.find(r => r.rarity === h.rarity);
+                    return (
+                      <div key={i} className="flex items-center justify-between px-3 py-2">
+                        <span className="font-bold text-slate-700">{h.name}</span>
+                        <span className={`font-black text-[10px] px-2 py-0.5 rounded-full ${rs?.bg} ${rs?.color} border ${rs?.border}`}>{h.rarity}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right: Result Display */}
-        <div className="flex-1 w-full bg-slate-900 rounded-[2rem] p-8 min-h-[300px] flex flex-col items-center justify-center relative overflow-hidden text-center">
+        <div className="flex-1 w-full bg-slate-900 rounded-[2rem] p-8 min-h-[260px] md:min-h-[300px] flex flex-col items-center justify-center relative overflow-hidden text-center">
           {/* Decorative background stars */}
           <div className="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-700 via-slate-900 to-black"></div>
-          
+
           {playingVideo ? (
-            <div className="relative z-10 w-full h-full flex flex-col items-center justify-center animate-in zoom-in duration-500">
-              <video 
-                src={playingVideo.url} 
-                className="w-full h-full object-cover rounded-2xl shadow-2xl"
-                autoPlay 
-                muted 
+            <div className="relative z-10 w-full flex flex-col items-center justify-center animate-in zoom-in duration-500">
+              <video
+                src={playingVideo.url}
+                className="w-full object-cover rounded-2xl shadow-2xl"
+                style={{ maxHeight: '280px' }}
+                autoPlay
+                muted
                 playsInline
                 onEnded={handleVideoEnded}
               />
             </div>
           ) : result ? (
-            <div className={`relative z-10 w-full animate-in zoom-in duration-500 delay-150`}>
+            <div className="relative z-10 w-full animate-in zoom-in duration-500 delay-150">
               <div className={`absolute -inset-4 bg-gradient-to-r from-transparent via-${currentRarityStyle.color.split('-')[1]}-500 to-transparent opacity-20 blur-xl animate-pulse`}></div>
               <div className="relative bg-slate-800/80 backdrop-blur-md border border-slate-700 p-6 rounded-3xl w-full">
                 <div className={`inline-block px-4 py-1 rounded-full text-xs font-black tracking-widest uppercase mb-4 shadow-lg ${currentRarityStyle.bg} ${currentRarityStyle.color} border ${currentRarityStyle.border}`}>
@@ -133,7 +179,7 @@ export default function GachaSystem({ points, onRoll }) {
                 <p className="text-[10px] font-bold text-slate-400 mb-6 uppercase tracking-widest">
                   {result.type === 'weapon' ? '⚔️ ぶき' : result.type === 'armor' ? '🛡️ よろい' : '💍 アクセサリー'}
                 </p>
-                
+
                 <div className="grid grid-cols-3 gap-2 mb-6">
                   <div className="bg-slate-900/50 rounded-lg p-3 border border-emerald-900/50">
                     <p className="text-[9px] text-emerald-500 font-black uppercase mb-1">HP</p>

@@ -125,7 +125,8 @@ const App = () => {
     messages,
     sb3Files,
     storageUsage,
-    setStorageUsage
+    setStorageUsage,
+    loading
   } = useFirebase(currentUser, appId);
 
 
@@ -151,6 +152,7 @@ const App = () => {
   const [isUploadingSb3, setIsUploadingSb3] = useState(false);
   const [isUploadingMaterialUpload, setIsUploadingMaterialUpload] = useState(false);
   const [isUploadingMaterialThumbnail, setIsUploadingMaterialThumbnail] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   const sb3InputRef = useRef(null);
 
@@ -270,7 +272,17 @@ const App = () => {
         childName: firstChild.name, nextClassDate: firstChild.nextClassDate, allChildren: parentChildren
       };
     }
-    if (found) { setCurrentUser(found); setActiveTab('mypage'); }
+    if (found) {
+      setCurrentUser(found);
+      setActiveTab('mypage');
+      // Update lastLoginAt for student/parent
+      if (found.studentId || found.childId) {
+        const sid = found.studentId || found.childId;
+        try {
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', sid), { lastLoginAt: serverTimestamp() });
+        } catch (_) {}
+      }
+    }
     else { setAuthError('IDまたはパスワードが正しくありません'); }
   };
 
@@ -291,7 +303,8 @@ const App = () => {
 
   const sendMessage = async (e, receiverId, studentIdCtx) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || isSendingMessage) return;
+    setIsSendingMessage(true);
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), {
         text: newMessage,
@@ -304,7 +317,10 @@ const App = () => {
         createdAt: serverTimestamp(),
       });
       setNewMessage('');
+      setSaveMessage('メッセージを送りました！');
+      setTimeout(() => setSaveMessage(''), 3000);
     } catch (err) { setSaveMessage('メッセージ送信エラー'); setTimeout(() => setSaveMessage(''), 3000); }
+    finally { setIsSendingMessage(false); }
   };
 
   const uploadSb3File = async (e) => {
@@ -366,6 +382,18 @@ const App = () => {
     return <Login loginId={loginId} setLoginId={setLoginId} password={password} setPassword={setPassword} handleLogin={handleLogin} authError={authError} />;
   }
 
+  // Show loading spinner while Firestore data loads
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-orange-50 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-slate-500 font-bold text-sm">データを読み込んでいるよ...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (activeWorkspace) {
     return <Workspace activeWorkspace={activeWorkspace} setActiveWorkspace={setActiveWorkspace} splitRatio={splitRatio} setSplitRatio={setSplitRatio} isDragging={isDragging} setIsDragging={setIsDragging} />;
   }
@@ -419,6 +447,7 @@ const App = () => {
           newMessage={newMessage}
           setNewMessage={setNewMessage}
           sendMessage={sendMessage}
+          isSendingMessage={isSendingMessage}
           studentSearchQuery={studentSearchQuery}
           setStudentSearchQuery={setStudentSearchQuery}
           MATERIAL_CATEGORIES={MATERIAL_CATEGORIES}
@@ -452,6 +481,7 @@ const App = () => {
           newMessage={newMessage}
           setNewMessage={setNewMessage}
           sendMessage={sendMessage}
+          isSendingMessage={isSendingMessage}
           parentComment={parentComment}
           setParentComment={setParentComment}
           handleMaterialOpen={handleMaterialOpen}
