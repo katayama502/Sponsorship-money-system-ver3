@@ -186,6 +186,45 @@ const getPlayerLevel = (xp = 0) => {
   return 1;
 };
 
+// --- ローマ字の複数入力対応 ---
+// 同じひらがなで複数のローマ字表記がある場合の対応表
+// 例: し → "shi" または "si"、ち → "chi" または "ti" など
+const ROMAJI_SUBS = [
+  // 長いパターンを先に処理（sha より前に shi が来ても問題ないが念のため）
+  ['sha', 'sya'],
+  ['shi', 'si'],
+  ['sho', 'syo'],
+  ['shu', 'syu'],
+  ['chi', 'ti'],
+  ['cha', 'tya'],
+  ['cho', 'tyo'],
+  ['chu', 'tyu'],
+  ['tsu', 'tu'],
+  ['fu',  'hu'],
+  ['ji',  'zi'],
+  ['ja',  'zya'],
+  ['jo',  'zyo'],
+  ['ju',  'zyu'],
+];
+
+/**
+ * 与えられた正規ローマ字に対して、すべての有効な入力バリエーションを返す
+ * 例: "jitensha" → ["jitensha", "jitensya", "zitensha", "zitensya"]
+ */
+const getAllValidRomaji = (canonical) => {
+  let results = new Set([canonical]);
+  for (const [from, to] of ROMAJI_SUBS) {
+    const next = new Set();
+    for (const s of results) {
+      next.add(s);
+      if (s.includes(from)) next.add(s.split(from).join(to));
+      if (s.includes(to))   next.add(s.split(to).join(from));
+    }
+    results = next;
+  }
+  return [...results];
+};
+
 const ENEMY_ATTACK_INTERVAL_MS = 3500; // Enemy attacks every 3.5 seconds
 
 // --- Player stats mapping by game level (1-5 mapped from XP level) ---
@@ -327,17 +366,21 @@ const TypingGame = ({ studentId, studentXp = 0, completedCount, totalMaterials, 
   const handleInput = (e) => {
     const val = e.target.value;
     setInputValue(val);
-    if (currentWord && !currentWord.romaji.startsWith(val.toLowerCase())) {
-      setIsWrongInput(true);
-    } else {
-      setIsWrongInput(false);
+    if (currentWord) {
+      const lower = val.toLowerCase();
+      const validForms = getAllValidRomaji(currentWord.romaji);
+      // 入力中の文字列がいずれかの有効ローマ字の先頭と一致していれば OK
+      const isValid = validForms.some(r => r.startsWith(lower));
+      setIsWrongInput(!isValid);
     }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!currentWord) return;
-    if (inputValue.trim().toLowerCase() === currentWord.romaji) {
+    const typed = inputValue.trim().toLowerCase();
+    const validForms = getAllValidRomaji(currentWord.romaji);
+    if (validForms.includes(typed)) {
       // Correct!
       const dmg = playerAtk + Math.floor(Math.random() * 5);
       setEnemyHp(prev => {
