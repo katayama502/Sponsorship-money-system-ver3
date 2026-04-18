@@ -11,7 +11,8 @@ import {
   getDoc,
   getDocs,
   query,
-  where
+  where,
+  increment
 } from 'firebase/firestore';
 import {
   ref,
@@ -223,36 +224,29 @@ export default function useAdminActions({
   };
 
   const submitAdminComment = async (recordId) => {
-    const text = adminComment[recordId];
+    const text = (adminComment[recordId] || '').trim();
     if (!text || submittingComments.current.has(recordId)) return;
     submittingComments.current.add(recordId);
     try {
       const recordRef = doc(db, 'artifacts', appId, 'public', 'data', 'learning_records', recordId);
       const snap = await getDoc(recordRef);
+      if (!snap.exists()) { setSaveMessage('記録が見つかりません'); return; }
       const data = snap.data();
+      const alreadyPointed = !!data.commentPointed;
 
       const batch = writeBatch(db);
       batch.update(recordRef, { comment: text, commentAt: serverTimestamp(), commentPointed: true });
 
-      // Give student 1 point and 30XP only if not yet pointed
-      if (data.studentId && !data.commentPointed) {
+      // Use increment() to avoid read-modify-write race condition
+      if (data.studentId && !alreadyPointed) {
         const sRef = doc(db, 'artifacts', appId, 'public', 'data', 'students', data.studentId);
-        const sSnap = await getDoc(sRef);
-        const sData = sSnap.exists() ? sSnap.data() : {};
-        batch.update(sRef, {
-          points: (sData.points || 0) + 1,
-          xp: (sData.xp || 0) + 30
-        });
+        batch.update(sRef, { points: increment(1), xp: increment(30) });
       }
 
       await batch.commit();
-      setAdminComment(prev => {
-        const next = { ...prev };
-        delete next[recordId];
-        return next;
-      });
-      setSaveMessage(data.commentPointed ? 'コメントを更新しました' : 'コメントとポイント(+1pt/30XP)を送信しました');
-    } catch (err) { setSaveMessage('失敗'); }
+      setAdminComment(prev => { const next = { ...prev }; delete next[recordId]; return next; });
+      setSaveMessage(alreadyPointed ? 'コメントを更新しました' : 'コメントとポイント(+1pt/30XP)を送信しました');
+    } catch (err) { setSaveMessage('コメント送信に失敗しました'); }
     finally { submittingComments.current.delete(recordId); }
     setTimeout(() => setSaveMessage(''), 3000);
   };
@@ -260,28 +254,38 @@ export default function useAdminActions({
   const approveCompletion = async (requestId, studentId, materialId) => {
     if (!window.confirm('この完了申請を承認しますか？(+50XP付与)')) return;
     try {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'completion_requests', requestId), {
-        status: 'approved', approvedAt: serverTimestamp()
-      });
       const sRef = doc(db, 'artifacts', appId, 'public', 'data', 'students', studentId);
       const sSnap = await getDoc(sRef);
-      if (sSnap.exists()) {
-        const sData = sSnap.data();
-        const completed = sData.completedMaterials || [];
-        if (!completed.includes(materialId)) {
-          await updateDoc(sRef, {
-            completedMaterials: [...completed, materialId],
-            xp: (sData.xp || 0) + 50
-          });
-          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), {
-            text: `🎉 カリキュラム完了が承認されました！+50XP獲得！`,
-            senderId: 'admin', senderRole: 'admin', senderName: '講師・サポーター',
-            receiverId: studentId, studentId, isRead: false, createdAt: serverTimestamp(),
-          });
-        }
+      if (!sSnap.exists()) { setSaveMessage('生徒データが見つかりません'); return; }
+      const sData = sSnap.data();
+      const completed = sData.completedMaterials || [];
+
+      if (completed.includes(materialId)) {
+        // Already completed — just update request status
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'completion_requests', requestId), {
+          status: 'approved', approvedAt: serverTimestamp()
+        });
+        setSaveMessage('承認しました（XP付与済み）');
+        setTimeout(() => setSaveMessage(''), 3000);
+        return;
       }
+
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'artifacts', appId, 'public', 'data', 'completion_requests', requestId), {
+        status: 'approved', approvedAt: serverTimestamp()
+      });
+      // Use arrayUnion + increment to avoid race conditions
+      const { arrayUnion } = await import('firebase/firestore');
+      batch.update(sRef, { completedMaterials: arrayUnion(materialId), xp: increment(50) });
+      await batch.commit();
+
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), {
+        text: '🎉 カリキュラム完了が承認されました！+50XP獲得！',
+        senderId: 'admin', senderRole: 'admin', senderName: '講師・サポーター',
+        receiverId: studentId, studentId, isRead: false, createdAt: serverTimestamp(),
+      });
       setSaveMessage('承認しました (+50XP)');
-    } catch (err) { setSaveMessage('失敗'); }
+    } catch (err) { setSaveMessage('承認処理に失敗しました'); }
     setTimeout(() => setSaveMessage(''), 3000);
   };
 

@@ -98,12 +98,21 @@ const MATERIAL_CATEGORIES = [
   { id: 'robot', label: 'Robot' }
 ];
 
+// Simple client-side login rate limiter (resets on page reload — server-side rules enforce real limits)
+const loginAttempts = { count: 0, lockedUntil: 0 };
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_MS = 60_000; // 1 minute
+
+// Max SB3 file size: 50 MB
+const MAX_SB3_BYTES = 50 * 1024 * 1024;
+
 const App = () => {
   // --- Auth & Role State ---
   const [currentUser, setCurrentUser] = useState(null);
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // --- UI State ---
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -250,42 +259,65 @@ const App = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
-    if (loginId === 'admin' && password === 'admin123') {
-      setCurrentUser({ role: 'admin', name: 'システム管理者' });
-      setActiveTab('dashboard');
+
+    // Rate limiting
+    const now = Date.now();
+    if (now < loginAttempts.lockedUntil) {
+      const secs = Math.ceil((loginAttempts.lockedUntil - now) / 1000);
+      setAuthError(`ログイン試行が多すぎます。${secs}秒後に再試行してください`);
       return;
     }
-    const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'students'));
-    let found = null;
-    let parentChildren = [];
-    querySnapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      if (data.studentLoginId === loginId && data.studentPassword === password) {
-        found = { role: 'student', name: data.name, studentId: docSnap.id, nextClassDate: data.nextClassDate };
-      } else if (data.parentLoginId === loginId && data.parentPassword === password) {
-        parentChildren.push({ id: docSnap.id, ...data });
-      }
-    });
 
-    if (parentChildren.length > 0) {
-      const firstChild = parentChildren[0];
-      found = { 
-        role: 'parent', name: `${firstChild.name}の保護者`, childId: firstChild.id, 
-        childName: firstChild.name, nextClassDate: firstChild.nextClassDate, allChildren: parentChildren
-      };
-    }
-    if (found) {
-      setCurrentUser(found);
-      setActiveTab('mypage');
-      // Update lastLoginAt for student/parent
-      if (found.studentId || found.childId) {
-        const sid = found.studentId || found.childId;
-        try {
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', sid), { lastLoginAt: serverTimestamp() });
-        } catch (_) {}
+    setIsLoggingIn(true);
+    try {
+      if (loginId === 'admin' && password === 'admin123') {
+        loginAttempts.count = 0;
+        setCurrentUser({ role: 'admin', name: 'システム管理者' });
+        setActiveTab('dashboard');
+        return;
       }
+      const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'students'));
+      let found = null;
+      let parentChildren = [];
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.studentLoginId === loginId && data.studentPassword === password) {
+          found = { role: 'student', name: data.name, studentId: docSnap.id, nextClassDate: data.nextClassDate };
+        } else if (data.parentLoginId === loginId && data.parentPassword === password) {
+          parentChildren.push({ id: docSnap.id, ...data });
+        }
+      });
+
+      if (parentChildren.length > 0) {
+        const firstChild = parentChildren[0];
+        found = {
+          role: 'parent', name: `${firstChild.name}の保護者`, childId: firstChild.id,
+          childName: firstChild.name, nextClassDate: firstChild.nextClassDate, allChildren: parentChildren
+        };
+      }
+      if (found) {
+        loginAttempts.count = 0;
+        setCurrentUser(found);
+        setActiveTab('mypage');
+        if (found.studentId || found.childId) {
+          const sid = found.studentId || found.childId;
+          try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', sid), { lastLoginAt: serverTimestamp() }); } catch (_) {}
+        }
+      } else {
+        loginAttempts.count += 1;
+        if (loginAttempts.count >= MAX_LOGIN_ATTEMPTS) {
+          loginAttempts.lockedUntil = Date.now() + LOCKOUT_MS;
+          loginAttempts.count = 0;
+          setAuthError('ログイン試行が多すぎます。1分後に再試行してください');
+        } else {
+          setAuthError('IDまたはパスワードが正しくありません');
+        }
+      }
+    } catch (err) {
+      setAuthError('ログイン中にエラーが発生しました。再試行してください');
+    } finally {
+      setIsLoggingIn(false);
     }
-    else { setAuthError('IDまたはパスワードが正しくありません'); }
   };
 
   const handleLogout = () => { setCurrentUser(null); setLoginId(''); setPassword(''); };
@@ -330,6 +362,12 @@ const App = () => {
     if (!file || !file.name.endsWith('.sb3')) {
       setSaveMessage('エラー: .sb3ファイルを選択してください');
       setTimeout(() => setSaveMessage(''), 3000);
+      return;
+    }
+    if (file.size > MAX_SB3_BYTES) {
+      setSaveMessage(`エラー: ファイルサイズは${Math.round(MAX_SB3_BYTES / 1024 / 1024)}MB以下にしてください`);
+      setTimeout(() => setSaveMessage(''), 4000);
+      if (sb3InputRef.current) sb3InputRef.current.value = '';
       return;
     }
     setIsUploadingSb3(true);
@@ -381,7 +419,7 @@ const App = () => {
 
   // --- Rendering Conditional Logic ---
   if (!currentUser || !currentUser.role) {
-    return <Login loginId={loginId} setLoginId={setLoginId} password={password} setPassword={setPassword} handleLogin={handleLogin} authError={authError} />;
+    return <Login loginId={loginId} setLoginId={setLoginId} password={password} setPassword={setPassword} handleLogin={handleLogin} authError={authError} isLoggingIn={isLoggingIn} />;
   }
 
   // Show loading spinner while Firestore data loads

@@ -32,12 +32,14 @@ export default function Workspace({ activeWorkspace, setActiveWorkspace, splitRa
               </div>
             </div>
           )}
+          {/* sandbox: allow scripts/forms/popups for external learning materials, but restrict navigation */}
           <iframe
             src={activeWorkspace.url}
             title="Materials"
             className={`w-full h-full ${isDragging ? 'pointer-events-none' : ''}`}
             frameBorder="0"
-            allowFullScreen
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-presentation"
             onLoad={() => setMaterialLoaded(true)}
           />
         </div>
@@ -60,17 +62,19 @@ export default function Workspace({ activeWorkspace, setActiveWorkspace, splitRa
               </div>
             </div>
           )}
+          {/* Scratch editor: same-origin only, allow all needed APIs */}
           <iframe
             src="/scratch/editor.html"
             title="Scratch GUI"
             className={`w-full h-full ${isDragging ? 'pointer-events-none' : ''}`}
             frameBorder="0"
             allow="geolocation; microphone; camera; midi"
+            sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-downloads"
             onLoad={() => setScratchLoaded(true)}
           />
         </div>
 
-        {/* Overlay to catch events during drag */}
+        {/* Overlay to catch mouse events during drag */}
         {isDragging && <div className="absolute inset-0 z-[100] cursor-col-resize" />}
       </div>
     </div>
