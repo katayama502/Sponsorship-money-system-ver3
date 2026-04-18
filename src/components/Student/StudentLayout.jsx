@@ -376,21 +376,48 @@ export default function StudentLayout({
                 {isParent && (() => {
                   if (!studentData) return null;
                   const completedCount = studentData.completedMaterials?.length || 0;
+                  const totalMat = materials.length || 1;
+                  const pct = Math.min(100, Math.floor((completedCount / totalMat) * 100));
+                  const recCount = learningRecords.filter(r => r.studentId === studentIdCtx).length;
+                  const uncommentedCount = learningRecords.filter(r => r.studentId === studentIdCtx && !r.parentComment).length;
                   return (
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-                      <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">📊 せいちょうサマリー</p>
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
+                      <p className="text-xs font-black text-slate-500 uppercase tracking-widest">📊 {studentData.name}さんのせいちょう</p>
                       <div className="grid grid-cols-2 gap-2">
                         {[
-                          { label: 'クリア数', value: `${completedCount}教材`, icon: '🎯' },
-                          { label: 'きろく数', value: `${learningRecords.filter(r => r.studentId === studentIdCtx).length}件`, icon: '📝' },
-                        ].map(({ label, value, icon }) => (
-                          <div key={label} className="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
-                            <div className="text-xl mb-0.5">{icon}</div>
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
-                            <p className="text-base font-black text-slate-800">{value}</p>
+                          { label: 'レベル', value: `Lv.${level}`, icon: '⭐', color: 'text-violet-700', bg: 'bg-violet-50' },
+                          { label: '合計XP', value: `${studentXp.toLocaleString()} XP`, icon: '⚡', color: 'text-indigo-700', bg: 'bg-indigo-50' },
+                          { label: 'クリア教材', value: `${completedCount} / ${totalMat}`, icon: '🎯', color: 'text-emerald-700', bg: 'bg-emerald-50' },
+                          { label: 'きろく数', value: `${recCount}件`, icon: '📝', color: 'text-sky-700', bg: 'bg-sky-50' },
+                        ].map(({ label, value, icon, color, bg }) => (
+                          <div key={label} className={`${bg} rounded-xl p-3 text-center border border-white`}>
+                            <div className="text-lg mb-0.5">{icon}</div>
+                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{label}</p>
+                            <p className={`text-sm font-black ${color}`}>{value}</p>
                           </div>
                         ))}
                       </div>
+                      {/* Curriculum progress bar */}
+                      <div>
+                        <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1">
+                          <span>カリキュラム進捗</span>
+                          <span>{pct}%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                          <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all duration-700" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                      {/* Unread comment alert */}
+                      {uncommentedCount > 0 && (
+                        <button
+                          onClick={() => setActiveTab('growth')}
+                          className="w-full flex items-center gap-2 bg-sky-50 border border-sky-200 rounded-xl px-3 py-2 text-xs font-black text-sky-700 hover:bg-sky-100 transition-colors"
+                        >
+                          <span className="text-base">💙</span>
+                          応援メッセージを送ろう！（{uncommentedCount}件未コメント）
+                          <span className="ml-auto">→</span>
+                        </button>
+                      )}
                     </div>
                   );
                 })()}
@@ -415,7 +442,7 @@ export default function StudentLayout({
                   );
                 })()}
 
-                {/* Student quick-action buttons */}
+                {/* Quick-action buttons */}
                 {isStudent && (
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -431,6 +458,24 @@ export default function StudentLayout({
                     >
                       <ShieldPlus size={20} className="text-amber-600 mx-auto mb-1" />
                       <p className="text-xs font-black text-amber-700">キャラ強化</p>
+                    </button>
+                  </div>
+                )}
+                {isParent && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setActiveTab('growth')}
+                      className="bg-teal-50 border border-teal-200 rounded-2xl p-3 text-center hover:bg-teal-100 transition-colors"
+                    >
+                      <BookOpen size={20} className="text-teal-600 mx-auto mb-1" />
+                      <p className="text-xs font-black text-teal-700">きろくを見る</p>
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('materials')}
+                      className="bg-sky-50 border border-sky-200 rounded-2xl p-3 text-center hover:bg-sky-100 transition-colors"
+                    >
+                      <Trophy size={20} className="text-sky-600 mx-auto mb-1" />
+                      <p className="text-xs font-black text-sky-700">教材を確認</p>
                     </button>
                   </div>
                 )}
@@ -831,13 +876,18 @@ export default function StudentLayout({
 
         {/* ======== GROWTH TAB ======== */}
         {activeTab === 'growth' && (() => {
-          const myRecords = learningRecords
+          const allRecords = learningRecords
             .filter(r => r.studentId === studentIdCtx)
             .sort((a, b) => {
               const da = a.lessonDate || (a.createdAt?.seconds ? new Date(a.createdAt.seconds * 1000).toISOString().slice(0, 10) : '');
               const db2 = b.lessonDate || (b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000).toISOString().slice(0, 10) : '');
               return db2.localeCompare(da);
             });
+
+          const uncommentedByParent = allRecords.filter(r => !r.parentComment);
+          // For parent: show filter toggle; for student: always show all
+          const [showOnlyUncommented, setShowOnlyUncommented] = React.useState(false);
+          const myRecords = (isParent && showOnlyUncommented) ? uncommentedByParent : allRecords;
 
           const grouped = {};
           myRecords.forEach(r => {
@@ -851,17 +901,42 @@ export default function StudentLayout({
           const progressPct2 = Math.min(100, Math.floor((completedCount / totalMat) * 100));
 
           return (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              <header>
-                <h2 className="text-xl font-black text-slate-800">📚 成長の軌跡</h2>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">これまでの学びの記録をふり返ろう！</p>
+            <div className="space-y-5 animate-in fade-in duration-300">
+              <header className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                  <h2 className="text-xl font-black text-slate-800">📚 成長の軌跡</h2>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    {isParent ? `${studentData?.name || 'お子さん'}の学びの記録` : 'これまでの学びの記録をふり返ろう！'}
+                  </p>
+                </div>
+                {/* Parent filter toggle */}
+                {isParent && allRecords.length > 0 && (
+                  <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
+                    <button
+                      onClick={() => setShowOnlyUncommented(false)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${!showOnlyUncommented ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    >すべて ({allRecords.length})</button>
+                    <button
+                      onClick={() => setShowOnlyUncommented(true)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1 ${showOnlyUncommented ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      💙 未コメント
+                      {uncommentedByParent.length > 0 && (
+                        <span className={`text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center ${showOnlyUncommented ? 'bg-white/30 text-white' : 'bg-sky-500 text-white'}`}>
+                          {uncommentedByParent.length}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                )}
               </header>
 
+              {/* Stats grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { label: 'じゅぎょうの回数', value: `${groupedEntries.length}回`, icon: '📅', color: 'from-teal-400 to-emerald-500' },
-                  { label: 'きろく数', value: `${myRecords.length}件`, icon: '📝', color: 'from-sky-400 to-blue-500' },
-                  { label: 'もらったポイント', value: `${myRecords.filter(r => r.commentPointed).length}pt`, icon: '🌟', color: 'from-amber-400 to-orange-500' },
+                  { label: 'じゅぎょうの回数', value: `${Object.keys(allRecords.reduce((acc, r) => { const k = r.lessonDate || '?'; acc[k] = 1; return acc; }, {})).length}回`, icon: '📅', color: 'from-teal-400 to-emerald-500' },
+                  { label: 'きろく数', value: `${allRecords.length}件`, icon: '📝', color: 'from-sky-400 to-blue-500' },
+                  { label: isParent ? '応援コメント' : 'もらったポイント', value: isParent ? `${allRecords.filter(r => r.parentComment).length}件` : `${allRecords.filter(r => r.commentPointed).length}pt`, icon: isParent ? '💙' : '🌟', color: 'from-amber-400 to-orange-500' },
                   { label: 'カリキュラムのすすみ', value: `${progressPct2}%`, icon: '🎯', color: 'from-violet-400 to-purple-500' },
                 ].map(({ label, value, icon, color }) => (
                   <div key={label} className={`bg-gradient-to-br ${color} rounded-2xl p-4 text-white shadow-md`}>
@@ -872,7 +947,22 @@ export default function StudentLayout({
                 ))}
               </div>
 
-              {(customStats.hp > 0 || customStats.atk > 0 || customStats.def > 0) && (
+              {/* Parent: prompt to comment if there are uncommented records */}
+              {isParent && uncommentedByParent.length > 0 && !showOnlyUncommented && (
+                <button
+                  onClick={() => setShowOnlyUncommented(true)}
+                  className="w-full flex items-center gap-3 bg-sky-50 border border-sky-200 rounded-2xl px-4 py-3 text-sm font-black text-sky-700 hover:bg-sky-100 transition-colors"
+                >
+                  <span className="text-xl">💙</span>
+                  <div className="text-left">
+                    <p className="font-black text-sky-700">応援メッセージを送ろう！</p>
+                    <p className="text-xs text-sky-500 font-medium">まだコメントしていない記録が {uncommentedByParent.length}件 あります</p>
+                  </div>
+                  <span className="ml-auto text-sky-400">→</span>
+                </button>
+              )}
+
+              {isStudent && (customStats.hp > 0 || customStats.atk > 0 || customStats.def > 0) && (
                 <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4 flex-wrap shadow-sm">
                   <p className="text-xs font-black text-slate-700">⚔️ キャラクターボーナス</p>
                   <span className="text-xs font-bold text-rose-500">❤️ HP+{customStats.hp}</span>
@@ -881,11 +971,11 @@ export default function StudentLayout({
                 </div>
               )}
 
-              {groupedEntries.length === 0 ? (
+              {myRecords.length === 0 ? (
                 <div className="text-center py-16 text-slate-400">
-                  <div className="text-5xl mb-4">📭</div>
-                  <p className="font-bold">まだ記録がありません</p>
-                  <p className="text-xs mt-1">授業のあとに目標や振り返りを投稿してみよう！</p>
+                  <div className="text-5xl mb-4">{showOnlyUncommented ? '✅' : '📭'}</div>
+                  <p className="font-bold">{showOnlyUncommented ? 'すべての記録にコメント済みです！' : 'まだ記録がありません'}</p>
+                  <p className="text-xs mt-1">{showOnlyUncommented ? 'ありがとうございます💙' : '授業のあとに目標や振り返りを投稿してみよう！'}</p>
                 </div>
               ) : (
                 <div className="relative">
@@ -902,58 +992,67 @@ export default function StudentLayout({
                         </div>
                         <p className="text-[10px] font-black text-teal-600 uppercase tracking-widest mb-2">{date} — {records.length}件のきろく</p>
                         <div className="space-y-3">
-                          {records.map(record => (
-                            <div key={record.id} className={`rounded-2xl border p-4 shadow-sm ${record.recordType === 'goal' ? 'bg-emerald-50 border-emerald-100' : 'bg-orange-50 border-orange-100'}`}>
-                              <div className="flex items-center gap-2 mb-1.5">
-                                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${record.recordType === 'goal' ? 'bg-emerald-500 text-white' : 'bg-orange-500 text-white'}`}>
-                                  {record.recordType === 'goal' ? '🎯 もくひょう' : '📝 ふりかえり'}
-                                </span>
-                                {record.commentPointed && <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-600">🌟 +1pt</span>}
-                              </div>
-                              <h4 className="font-black text-slate-800 text-sm mb-1.5">{record.title}</h4>
-                              {typeof record.content === 'object' && record.content !== null
-                                ? Object.values(record.content).filter(Boolean).map((v, i) => (
-                                  <p key={i} className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap mb-1">{String(v)}</p>
-                                ))
-                                : <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{record.content}</p>
-                              }
-
-                              {record.comment && (
-                                <div className={`mt-3 p-3 rounded-xl border text-xs ${record.recordType === 'goal' ? 'bg-white border-emerald-200' : 'bg-white border-orange-200'}`}>
-                                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">💬 先生のコメント</p>
-                                  <p className="font-bold text-slate-700 italic">"{record.comment}"</p>
-                                </div>
-                              )}
-
-                              {(isParent || (isStudent && record.parentComment)) && (
-                                <div className="mt-2 p-3 rounded-xl border border-sky-200 bg-white text-xs">
-                                  <p className="text-[9px] font-black uppercase tracking-widest text-sky-500 mb-1">💙 おうちのひとのメッセージ</p>
-                                  {record.parentComment && <p className="font-bold text-slate-700 italic mb-2">"{record.parentComment}"</p>}
-                                  {isParent && (
-                                    <div className="flex gap-2">
-                                      <input
-                                        type="text"
-                                        placeholder="応援メッセージを送ろう！"
-                                        value={parentComment[record.id] || ''}
-                                        onChange={e => setParentComment({ ...parentComment, [record.id]: e.target.value })}
-                                        className="flex-1 bg-slate-50 border border-sky-200 rounded-lg px-3 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-sky-400"
-                                      />
-                                      <button
-                                        onClick={async () => {
-                                          try {
-                                            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'learning_records', record.id), { parentComment: parentComment[record.id] || '' });
-                                            setSaveMessage('保護者コメントを送信しました');
-                                            setTimeout(() => setSaveMessage(''), 3000);
-                                          } catch (e) { setSaveMessage('送信失敗'); }
-                                        }}
-                                        className="bg-sky-500 text-white font-bold px-3 py-2 rounded-lg text-xs hover:bg-sky-600 transition-colors"
-                                      >送信</button>
-                                    </div>
+                          {records.map(record => {
+                            const needsParentComment = isParent && !record.parentComment;
+                            return (
+                              <div key={record.id} className={`rounded-2xl border p-4 shadow-sm transition-all ${needsParentComment ? 'ring-2 ring-sky-200' : ''} ${record.recordType === 'goal' ? 'bg-emerald-50 border-emerald-100' : 'bg-orange-50 border-orange-100'}`}>
+                                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                  <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${record.recordType === 'goal' ? 'bg-emerald-500 text-white' : 'bg-orange-500 text-white'}`}>
+                                    {record.recordType === 'goal' ? '🎯 もくひょう' : '📝 ふりかえり'}
+                                  </span>
+                                  {record.commentPointed && <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-600">🌟 +1pt</span>}
+                                  {needsParentComment && (
+                                    <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-sky-100 text-sky-600 border border-sky-200">💙 未コメント</span>
                                   )}
                                 </div>
-                              )}
-                            </div>
-                          ))}
+                                <h4 className="font-black text-slate-800 text-sm mb-1.5">{record.title}</h4>
+                                {typeof record.content === 'object' && record.content !== null
+                                  ? Object.values(record.content).filter(Boolean).map((v, i) => (
+                                    <p key={i} className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap mb-1">{String(v)}</p>
+                                  ))
+                                  : <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{record.content}</p>
+                                }
+
+                                {record.comment && (
+                                  <div className={`mt-3 p-3 rounded-xl border text-xs ${record.recordType === 'goal' ? 'bg-white border-emerald-200' : 'bg-white border-orange-200'}`}>
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">💬 先生のコメント</p>
+                                    <p className="font-bold text-slate-700 italic">"{record.comment}"</p>
+                                  </div>
+                                )}
+
+                                {(isParent || (isStudent && record.parentComment)) && (
+                                  <div className={`mt-2 p-3 rounded-xl border text-xs ${needsParentComment ? 'border-sky-300 bg-sky-50' : 'border-sky-200 bg-white'}`}>
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-sky-500 mb-1">💙 おうちのひとのメッセージ</p>
+                                    {record.parentComment && <p className="font-bold text-slate-700 italic mb-2">"{record.parentComment}"</p>}
+                                    {isParent && (
+                                      <div className="flex gap-2">
+                                        <input
+                                          type="text"
+                                          placeholder={needsParentComment ? '応援メッセージを送ろう！' : 'メッセージを変更する'}
+                                          value={parentComment[record.id] || ''}
+                                          onChange={e => setParentComment({ ...parentComment, [record.id]: e.target.value })}
+                                          className="flex-1 bg-white border border-sky-200 rounded-lg px-3 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-sky-400"
+                                        />
+                                        <button
+                                          onClick={async () => {
+                                            if (!parentComment[record.id]?.trim()) return;
+                                            try {
+                                              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'learning_records', record.id), { parentComment: parentComment[record.id].trim() });
+                                              setSaveMessage('応援メッセージを送りました 💙');
+                                              setParentComment(prev => { const n = { ...prev }; delete n[record.id]; return n; });
+                                              setTimeout(() => setSaveMessage(''), 3000);
+                                            } catch (e) { setSaveMessage('送信失敗'); }
+                                          }}
+                                          disabled={!parentComment[record.id]?.trim()}
+                                          className={`shrink-0 font-bold px-3 py-2 rounded-lg text-xs transition-colors ${parentComment[record.id]?.trim() ? 'bg-sky-500 text-white hover:bg-sky-600' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                                        >送信</button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     ))}
@@ -962,8 +1061,8 @@ export default function StudentLayout({
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center shadow-md text-white text-xl border-4 border-white">🌱</div>
                       </div>
                       <div className="py-3">
-                        <p className="text-sm font-black text-violet-500">これからも頑張ろう！</p>
-                        <p className="text-xs text-slate-400 font-medium">きろくをつづけて、もっともっとせいちょうしていこう！</p>
+                        <p className="text-sm font-black text-violet-500">{isParent ? 'ありがとうございます💙' : 'これからも頑張ろう！'}</p>
+                        <p className="text-xs text-slate-400 font-medium">{isParent ? 'お子さんの成長を一緒に見守りましょう！' : 'きろくをつづけて、もっともっとせいちょうしていこう！'}</p>
                       </div>
                     </div>
                   </div>
@@ -976,7 +1075,41 @@ export default function StudentLayout({
         {/* ======== MATERIALS TAB ======== */}
         {activeTab === 'materials' && (
           <div className="space-y-6 animate-in fade-in duration-300">
-            <header><h2 className="text-xl font-black text-slate-800">きょうざいをみよう</h2></header>
+            <header>
+              <h2 className="text-xl font-black text-slate-800">きょうざいをみよう</h2>
+            </header>
+
+            {/* Parent: completion progress banner */}
+            {isParent && (() => {
+              const completedIds = studentData?.completedMaterials || [];
+              const total = materials.filter(m => m.isPublished !== false).length;
+              const done = completedIds.length;
+              const pct = total > 0 ? Math.min(100, Math.floor((done / total) * 100)) : 0;
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                  <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <Trophy size={16} className="text-amber-500 shrink-0" />
+                      <span className="text-sm font-black text-slate-800">カリキュラム達成率</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs font-bold text-slate-500">
+                      <span>クリア: <span className="text-emerald-600 font-black">{done}</span> 教材</span>
+                      <span>残り: <span className="text-slate-800 font-black">{total - done}</span> 教材</span>
+                      <span className="text-lg font-black text-amber-600">{pct}%</span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all duration-700 relative"
+                      style={{ width: `${pct}%` }}
+                    >
+                      {pct > 10 && <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.15)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.15)_50%,rgba(255,255,255,0.15)_75%,transparent_75%,transparent)] bg-[length:0.75rem_0.75rem]" />}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="space-y-10">
               {[...MATERIAL_CATEGORIES, { id: 'other', label: 'その他' }].map(category => {
                 const categoryMaterials = category.id === 'other'
