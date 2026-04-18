@@ -72,6 +72,7 @@ export default function StudentLayout({
   const [isSubmittingComplete, setIsSubmittingComplete] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [showOnlyUncommented, setShowOnlyUncommented] = useState(false);
+  const [materialSearch, setMaterialSearch] = useState('');
   const prevLevelRef = useRef(null);
   const msgEndRef = useRef(null);
 
@@ -551,8 +552,8 @@ export default function StudentLayout({
                     />
                     <button
                       type="submit"
-                      disabled={isSendingMessage}
-                      className={`px-4 rounded-xl font-black text-xs tracking-widest uppercase transition-colors ${isSendingMessage ? 'bg-slate-200 text-slate-400' : 'bg-slate-900 text-white hover:bg-orange-600'}`}
+                      disabled={isSendingMessage || !newMessage.trim()}
+                      className={`px-4 rounded-xl font-black text-xs tracking-widest uppercase transition-colors ${(isSendingMessage || !newMessage.trim()) ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-orange-600'}`}
                     >送信</button>
                   </form>
                 </div>
@@ -1074,8 +1075,19 @@ export default function StudentLayout({
         {/* ======== MATERIALS TAB ======== */}
         {activeTab === 'materials' && (
           <div className="space-y-6 animate-in fade-in duration-300">
-            <header>
+            <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <h2 className="text-xl font-black text-slate-800">きょうざいをみよう</h2>
+              <div className="relative max-w-xs w-full">
+                <input
+                  type="text"
+                  placeholder="タイトルでさがす..."
+                  value={materialSearch}
+                  onChange={e => setMaterialSearch(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-9 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-orange-400 shadow-sm"
+                />
+                <BookOpen size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                {materialSearch && <button onClick={() => setMaterialSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"><X size={14} /></button>}
+              </div>
             </header>
 
             {/* Parent: completion progress banner */}
@@ -1110,7 +1122,46 @@ export default function StudentLayout({
             })()}
 
             <div className="space-y-10">
-              {[...MATERIAL_CATEGORIES, { id: 'other', label: 'その他' }].map(category => {
+              {materialSearch ? (
+                // Search results view
+                <div className="space-y-4">
+                  {(() => {
+                    const results = materials.filter(m => m.isPublished !== false && m.title?.toLowerCase().includes(materialSearch.toLowerCase()));
+                    if (results.length === 0) return <div className="text-center py-16 text-slate-400 font-bold">「{materialSearch}」に一致する教材は見つかりませんでした</div>;
+                    return (
+                      <>
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{results.length}件のけっか</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {results.map(m => {
+                            const isYoutube = !!getYoutubeEmbedUrl(m.url);
+                            const isScratch = m.category === 'scratch' || (m.tags && m.tags.some(t => t.toLowerCase() === 'scratch'));
+                            const isCompleted = studentData?.completedMaterials?.includes(m.id) || false;
+                            return (
+                              <div key={m.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 flex flex-col">
+                                <div className="p-4 flex-1 flex flex-col gap-3">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${isYoutube ? 'bg-red-100 text-red-600' : isScratch ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-600'}`}>
+                                      {isYoutube ? 'YouTube' : isScratch ? 'Scratch' : m.category || 'Web'}
+                                    </span>
+                                    {isCompleted && <CheckCircle2 size={14} className="text-emerald-500" />}
+                                  </div>
+                                  <h4 className="font-black text-slate-800 text-sm flex-1 cursor-pointer hover:text-orange-600 transition-colors line-clamp-3 leading-snug" onClick={(e) => handleMaterialOpen(e, m)}>
+                                    {m.title}
+                                  </h4>
+                                  <button onClick={(e) => handleMaterialOpen(e, m)} className="w-full py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs font-black border border-slate-200 text-slate-500 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-600 transition-all">
+                                    <PlayCircle size={14} /> ひらく
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : null}
+              {!materialSearch && [...MATERIAL_CATEGORIES, { id: 'other', label: 'その他' }].map(category => {
                 const categoryMaterials = category.id === 'other'
                   ? materials.filter(m => m.isPublished !== false && !MATERIAL_CATEGORIES.some(c => c.id === m.category))
                   : materials.filter(m => m.isPublished !== false && m.category === category.id);

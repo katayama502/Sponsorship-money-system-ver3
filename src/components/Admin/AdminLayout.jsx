@@ -88,6 +88,10 @@ export default function AdminLayout({
 }) {
   const [copiedField, setCopiedField] = useState(null);
   const [materialCategoryFilter, setMaterialCategoryFilter] = useState('all');
+  const [materialSearchQuery, setMaterialSearchQuery] = useState('');
+  const [recordFilter, setRecordFilter] = useState('uncommented');
+  const [recordStudentFilter, setRecordStudentFilter] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState(null);
 
   const copyToClipboard = (text, fieldKey) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -301,6 +305,32 @@ export default function AdminLayout({
                   </div>
                 </div>
               </div>
+
+              {/* 本日の授業 */}
+              {(() => {
+                const today = new Date().toISOString().slice(0, 10);
+                const todayStudents = (students || []).filter(s => s.nextClassDate === today);
+                if (todayStudents.length === 0) return null;
+                return (
+                  <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-3xl p-6 text-white shadow-lg">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-black flex items-center gap-2">📅 本日の授業（{todayStudents.length}名）</h3>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      {todayStudents.map(s => (
+                        <button
+                          key={s.id}
+                          onClick={() => { setActiveTab('students'); setActiveStudentDetail(s.id); }}
+                          className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-xl transition-colors"
+                        >
+                          <div className="w-7 h-7 bg-white/30 rounded-lg flex items-center justify-center font-black text-sm">{s.name?.[0] || '?'}</div>
+                          <span className="font-black text-sm">{s.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* 生徒一覧クイックアクセス */}
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
@@ -557,13 +587,48 @@ export default function AdminLayout({
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   <div className="lg:col-span-1 space-y-6">
-                    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-                      <h3 className="text-sm font-black text-slate-800 mb-4 border-b border-slate-100 pb-2">学習進捗</h3>
-                      <div className="flex items-center justify-between mb-2">
-                         <span className="text-xs font-bold text-slate-500">完了カリキュラム</span>
-                         <span className="text-sm font-black text-orange-600">{completedCount} / {materials.length}</span>
+                    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+                      <h3 className="text-sm font-black text-slate-800 border-b border-slate-100 pb-2">学習進捗</h3>
+                      <div className="grid grid-cols-2 gap-2 text-center">
+                        <div className="bg-violet-50 rounded-xl p-2.5">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">レベル</p>
+                          <p className="text-xl font-black text-violet-600">Lv.{Math.floor(Math.sqrt((s.xp || 0) / 100)) + 1 > 20 ? 20 : Math.floor(Math.sqrt((s.xp || 0) / 100)) + 1}</p>
+                        </div>
+                        <div className="bg-indigo-50 rounded-xl p-2.5">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">合計XP</p>
+                          <p className="text-xl font-black text-indigo-600">{(s.xp || 0).toLocaleString()}</p>
+                        </div>
+                        <div className="bg-amber-50 rounded-xl p-2.5">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">ポイント</p>
+                          <p className="text-xl font-black text-amber-600">{s.points || 0}</p>
+                        </div>
+                        <div className="bg-emerald-50 rounded-xl p-2.5">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">きろく数</p>
+                          <p className="text-xl font-black text-emerald-600">{studentRecords.length}</p>
+                        </div>
                       </div>
-                      <div className="w-full bg-slate-100 rounded-full h-3 mb-4 overflow-hidden"><div className="bg-orange-500 h-3 rounded-full transition-all duration-1000" style={{ width: `${progressPercentage}%` }}></div></div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-bold text-slate-500">完了カリキュラム</span>
+                          <span className="text-sm font-black text-orange-600">{completedCount} / {materials.length}</span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden"><div className="bg-orange-500 h-3 rounded-full transition-all duration-1000" style={{ width: `${progressPercentage}%` }}></div></div>
+                      </div>
+                      {s.nextClassDate && (
+                        <div className="flex items-center gap-2 bg-orange-50 border border-orange-100 rounded-xl px-3 py-2">
+                          <span className="text-base">📅</span>
+                          <div>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">次回授業</p>
+                            <p className="text-sm font-black text-slate-800">{s.nextClassDate}</p>
+                          </div>
+                        </div>
+                      )}
+                      {s.remarks && (
+                        <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                          <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest mb-1">備考</p>
+                          <p className="text-xs font-medium text-slate-700 whitespace-pre-wrap">{s.remarks}</p>
+                        </div>
+                      )}
                     </div>
 
                     <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm overflow-hidden">
@@ -629,13 +694,23 @@ export default function AdminLayout({
                                </div>
                                {record.linkUrl && <a href={record.linkUrl} target="_blank" className="text-xs font-bold text-orange-600 flex items-center gap-1"><LinkIcon size={12}/> 作品リンク</a>}
                                <div className="bg-[#FFF5F0] p-4 rounded-xl border border-orange-100">
-                                  <p className="text-[10px] font-black text-orange-600 mb-2 flex items-center gap-1"><MessageSquare size={12}/> 講師コメント</p>
-                                  {record.comment ? <p className="text-sm font-bold text-slate-700 italic">"{record.comment}"</p> : 
-                                    <div className="flex gap-2">
-                                      <input type="text" placeholder="コメントを入力..." value={adminComment[record.id] || ''} onChange={e => setAdminComment({...adminComment, [record.id]: e.target.value})} className="flex-1 text-xs border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-orange-500" />
-                                      <button onClick={() => submitAdminComment(record.id)} className="bg-slate-900 text-white px-3 py-2 rounded-lg text-xs font-bold">送信</button>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <p className="text-[10px] font-black text-orange-600 flex items-center gap-1"><MessageSquare size={12}/> 講師コメント</p>
+                                    {record.comment && editingCommentId !== record.id && (
+                                      <button onClick={() => { setEditingCommentId(record.id); setAdminComment(prev => ({ ...prev, [record.id]: record.comment })); }} className="text-[9px] font-black text-orange-400 hover:text-orange-600 uppercase tracking-widest">編集</button>
+                                    )}
+                                  </div>
+                                  {record.comment && editingCommentId !== record.id ? (
+                                    <p className="text-sm font-bold text-slate-700 italic">"{record.comment}"</p>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      <input type="text" placeholder="コメントを入力..." value={adminComment[record.id] || ''} onChange={e => setAdminComment({...adminComment, [record.id]: e.target.value})} onKeyDown={e => { if (e.key === 'Enter' && adminComment[record.id]?.trim()) { submitAdminComment(record.id); setEditingCommentId(null); } }} className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-orange-500" />
+                                      <div className="flex gap-2">
+                                        {editingCommentId === record.id && <button onClick={() => setEditingCommentId(null)} className="flex-1 bg-slate-100 text-slate-500 text-xs font-bold py-2 rounded-lg">キャンセル</button>}
+                                        <button onClick={() => { submitAdminComment(record.id); setEditingCommentId(null); }} disabled={!adminComment[record.id]?.trim()} className={`flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-colors ${adminComment[record.id]?.trim() ? 'bg-slate-900 text-white hover:bg-orange-600' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}>{record.comment ? '更新' : '送信'}</button>
+                                      </div>
                                     </div>
-                                  }
+                                  )}
                                </div>
                             </div>
                          ))
@@ -669,15 +744,6 @@ export default function AdminLayout({
                       <p className="text-[9px] text-slate-400">※URLを直接入力するか、アップロードボタンからファイルを選択してください。</p>
                     </div>
 
-                    {materialForm.category === 'scratch' ? (
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left block">サムネイル画像</label>
-                        <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-slate-500 text-center">
-                          Scratchのサムネイルは自動設定されるため入力不要です
-                        </div>
-                      </div>
-                    ) : null}
-
                     <div className="space-y-1">
                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left block">ダウンロード素材URL</label>
                        <input type="url" placeholder="ダウンロード素材ファイルのURL (任意)" value={materialForm.downloadUrl || ''} onChange={e => setMaterialForm({ ...materialForm, downloadUrl: e.target.value })} className="w-full bg-slate-50 border border-amber-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-amber-400" />
@@ -701,9 +767,21 @@ export default function AdminLayout({
                 <div className="md:col-span-2 space-y-4 text-left">
                   {(() => {
                     const categories = ['all', ...Array.from(new Set((materials || []).map(m => m.category).filter(Boolean)))];
-                    const filtered = materialCategoryFilter === 'all' ? (materials || []) : (materials || []).filter(m => m.category === materialCategoryFilter);
+                    const searchFiltered = materialSearchQuery ? (materials || []).filter(m => m.title?.toLowerCase().includes(materialSearchQuery.toLowerCase())) : (materials || []);
+                    const filtered = materialCategoryFilter === 'all' ? searchFiltered : searchFiltered.filter(m => m.category === materialCategoryFilter);
                     return (
                       <>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="タイトルで検索..."
+                            value={materialSearchQuery}
+                            onChange={e => setMaterialSearchQuery(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-5 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-orange-400 shadow-sm"
+                          />
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"><BookOpen size={16} /></span>
+                          {materialSearchQuery && <button onClick={() => setMaterialSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"><X size={14} /></button>}
+                        </div>
                         <div className="flex flex-wrap gap-2">
                           {categories.map(cat => {
                             const count = cat === 'all' ? (materials || []).length : (materials || []).filter(m => m.category === cat).length;
@@ -836,24 +914,47 @@ export default function AdminLayout({
 
           {/* 提出シート確認 (Admin) */}
           {activeTab === 'records' && (
-            <div className="space-y-8 animate-in fade-in duration-500 text-left">
-              <header className="flex justify-between items-end">
+            <div className="space-y-6 animate-in fade-in duration-500 text-left">
+              <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
                 <h2 className="text-2xl font-black tracking-tight text-left text-slate-800">生徒の提出シート一覧</h2>
+                <div className="flex flex-wrap gap-2">
+                  <div className="flex bg-slate-100 p-1 rounded-xl">
+                    <button onClick={() => setRecordFilter('uncommented')} className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${recordFilter === 'uncommented' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                      未コメントのみ {recordFilter === 'uncommented' && `(${(learningRecords || []).filter(r => !r.comment && (!recordStudentFilter || r.studentId === recordStudentFilter)).length})`}
+                    </button>
+                    <button onClick={() => setRecordFilter('all')} className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${recordFilter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>全て表示</button>
+                  </div>
+                  <select value={recordStudentFilter} onChange={e => setRecordStudentFilter(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-orange-400 text-slate-600 appearance-none">
+                    <option value="">全生徒</option>
+                    {(students || []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
               </header>
 
               <div className="space-y-6">
-                {(learningRecords || []).filter(r => !r.comment).length === 0 ? (
-                  <div className="bg-white rounded-3xl border border-dashed border-slate-200 p-20 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">未確認の提出記録はありません</div>
-                ) : (
-                  (learningRecords || []).filter(r => !r.comment).sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()).map(record => (
-                    <div key={record.id} className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm text-left p-6 md:p-8">
+                {(() => {
+                  let records = (learningRecords || []);
+                  if (recordFilter === 'uncommented') records = records.filter(r => !r.comment);
+                  if (recordStudentFilter) records = records.filter(r => r.studentId === recordStudentFilter);
+                  records = records.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                  if (records.length === 0) return (
+                    <div className="bg-white rounded-3xl border border-dashed border-slate-200 p-20 text-center text-slate-400 font-bold text-xs uppercase tracking-widest">
+                      {recordFilter === 'uncommented' ? '未確認の提出記録はありません' : '提出記録がありません'}
+                    </div>
+                  );
+                  return records.map(record => {
+                    const isCommented = !!record.comment;
+                    const isEditing = editingCommentId === record.id;
+                    return (
+                    <div key={record.id} className={`bg-white rounded-[2rem] border overflow-hidden shadow-sm text-left p-6 md:p-8 ${isCommented ? 'border-emerald-200' : 'border-slate-200'}`}>
                       <div className="flex flex-col md:flex-row gap-6">
                         <div className="flex-1 space-y-4">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 flex-wrap">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black tracking-widest uppercase ${record.recordType === 'goal' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600'}`}>
                               {record.recordType === 'goal' ? '目標シート' : '振り返りシート'}
                             </span>
-                            <span className="text-[10px] font-bold text-slate-400">{new Date(record.date).toLocaleDateString()}</span>
+                            <span className="text-[10px] font-bold text-slate-400">{new Date(record.date || record.lessonDate || '').toLocaleDateString()}</span>
+                            {isCommented && <span className="text-[9px] font-black bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full flex items-center gap-1"><CheckCircle2 size={10} /> コメント済み</span>}
                           </div>
                           <h4 className="text-xl font-black text-slate-800">{record.title} <span className="text-sm font-medium text-slate-400 ml-2">by {record.studentName}</span></h4>
 
@@ -871,11 +972,10 @@ export default function AdminLayout({
                             ) : (
                               <p className="text-sm text-slate-700 font-medium whitespace-pre-wrap">{record.content}</p>
                             )}
-
                             {record.linkUrl && (
                               <div className="mt-4 flex items-center gap-2 pt-3 border-t border-slate-200">
                                 <LinkIcon size={14} className="text-orange-500" />
-                                <a href={record.linkUrl} target="_blank" className="text-xs font-bold text-orange-600 hover:underline">作品リンク</a>
+                                <a href={record.linkUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-orange-600 hover:underline">作品リンク</a>
                               </div>
                             )}
                           </div>
@@ -883,33 +983,49 @@ export default function AdminLayout({
 
                         <div className="md:w-80 shrink-0 bg-[#FFF5F0] rounded-2xl p-5 border border-orange-100 flex flex-col justify-between">
                           <div>
-                            <h5 className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-3 flex items-center gap-1.5"><MessageSquare size={12} /> 講師コメント</h5>
-                            {record.comment ? (
+                            <div className="flex items-center justify-between mb-3">
+                              <h5 className="text-[10px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-1.5"><MessageSquare size={12} /> 講師コメント</h5>
+                              {isCommented && !isEditing && (
+                                <button onClick={() => { setEditingCommentId(record.id); setAdminComment(prev => ({ ...prev, [record.id]: record.comment })); }} className="text-[9px] font-black text-orange-400 hover:text-orange-600 uppercase tracking-widest">編集</button>
+                              )}
+                            </div>
+                            {isCommented && !isEditing && (
                               <p className="text-sm font-bold text-slate-700 leading-relaxed italic mb-4">"{record.comment}"</p>
-                            ) : null}
+                            )}
                           </div>
                           <div className="mt-auto">
-                            <textarea
-                              placeholder="コメントを入力..."
-                              value={adminComment[record.id] || ''}
-                              onChange={e => setAdminComment({ ...adminComment, [record.id]: e.target.value })}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium h-20 resize-none outline-none focus:ring-2 focus:ring-orange-500 mb-2"
-                            />
-                            <button
-                              onClick={() => submitAdminComment(record.id)}
-                              className="w-full bg-slate-900 text-white text-[10px] font-black py-2.5 rounded-xl transition-all hover:bg-orange-600 active:scale-95 uppercase tracking-widest"
-                            >
-                              送信する
-                            </button>
+                            {(!isCommented || isEditing) && (
+                              <>
+                                <textarea
+                                  placeholder="コメントを入力... (Ctrl+Enter で送信)"
+                                  value={adminComment[record.id] || ''}
+                                  onChange={e => setAdminComment({ ...adminComment, [record.id]: e.target.value })}
+                                  onKeyDown={e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && adminComment[record.id]?.trim()) { submitAdminComment(record.id); setEditingCommentId(null); } }}
+                                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium h-24 resize-none outline-none focus:ring-2 focus:ring-orange-500 mb-2"
+                                />
+                                <div className="flex gap-2">
+                                  {isEditing && <button onClick={() => setEditingCommentId(null)} className="flex-1 bg-slate-100 text-slate-600 text-[10px] font-black py-2.5 rounded-xl hover:bg-slate-200 transition-colors">キャンセル</button>}
+                                  <button
+                                    onClick={() => { submitAdminComment(record.id); setEditingCommentId(null); }}
+                                    disabled={!adminComment[record.id]?.trim()}
+                                    className={`flex-1 text-[10px] font-black py-2.5 rounded-xl transition-all uppercase tracking-widest ${adminComment[record.id]?.trim() ? 'bg-slate-900 text-white hover:bg-orange-600 active:scale-95' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                                  >
+                                    {isCommented ? '更新する' : '送信する'}
+                                  </button>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
                     </div>
-                  ))
-                )}
+                    );
+                  });
+                })()}
               </div>
             </div>
           )}
+
         </div>
       </main>
     </div>

@@ -3,6 +3,7 @@ import { db, appId } from '../firebase.js';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { Swords, Heart, Zap, Trophy, RotateCcw, ChevronRight, Shield, X } from 'lucide-react';
 import { GACHA_ITEMS } from '../data/items.js';
+import { getLevelFromXp, getLevelCharacter, getGamePlayerLevel } from '../utils/xpUtils.js';
 
 // ----------------------------------------------------------------
 // 単語リスト (ひらがな + 標準ローマ字)
@@ -144,31 +145,8 @@ const STAGES = [
   { id: 20, name: '宇宙の真理',    emoji: '🌌', hp: 7000, atk: 400, minLv: 5, desc: '究極の試練！完全装備で挑め！', bg: 'from-indigo-950 via-black to-black' },
 ];
 
-// ----------------------------------------------------------------
-// XP / レベル計算
-// ----------------------------------------------------------------
-const _XP_THRESHOLDS = [50,100,160,240,340,460,600,760,940,1080,900,1100,1320,1560,1830,2120,2440,2790,3200];
-const _XP_CUMULATIVE = _XP_THRESHOLDS.reduce((acc, v, i) => { acc.push((acc[i-1]||0)+v); return acc; }, []);
-const _getLevelFromXp = (xp = 0) => {
-  for (let i = 0; i < _XP_CUMULATIVE.length; i++) { if (xp < _XP_CUMULATIVE[i]) return i + 1; }
-  return 20;
-};
-const getCharInfo = (xp = 0) => {
-  const level = _getLevelFromXp(xp);
-  if (level >= 20) return { imageUrl: '/characters/lv5.png', name: 'プログラミングマスター' };
-  if (level >= 15) return { imageUrl: '/characters/lv4.png', name: 'つよつよプログラマー' };
-  if (level >= 10) return { imageUrl: '/characters/lv3.png', name: 'ゆうかんなチャレンジャー' };
-  if (level >= 5)  return { imageUrl: '/characters/lv2.png', name: 'げんきなチャレンジャー' };
-  return { imageUrl: '/characters/lv1.png', name: 'はじまりのルーキー' };
-};
-const getPlayerLevel = (xp = 0) => {
-  const l = _getLevelFromXp(xp);
-  if (l >= 15) return 5;
-  if (l >= 10) return 4;
-  if (l >= 5)  return 3;
-  if (l >= 3)  return 2;
-  return 1;
-};
+// XP/レベル計算は xpUtils.js から import して重複を排除
+// getLevelFromXp, getLevelCharacter, getGamePlayerLevel を使用
 
 // ----------------------------------------------------------------
 // ローマ字複数表記の対応テーブル
@@ -271,8 +249,8 @@ const TypingGame = ({
   equipped = { weapon: null, armor: null, accessory: null },
   onGameClear
 }) => {
-  const playerLevel = getPlayerLevel(studentXp);
-  const charInfo = getCharInfo(studentXp);
+  const playerLevel = getGamePlayerLevel(studentXp);
+  const charInfo = getLevelCharacter(studentXp);
   const base = PLAYER_STATS[playerLevel];
 
   const totalCustomStats = React.useMemo(() => {
@@ -472,7 +450,7 @@ const TypingGame = ({
               <span className="text-rose-300">❤️ HP:{maxHp}</span>
               <span className="text-amber-300">⚡ ATK:{playerAtk}</span>
               <span className="text-sky-300">🛡️ DEF:{playerDef}</span>
-              <span className="text-slate-300">Lv.{_getLevelFromXp(studentXp)}</span>
+              <span className="text-slate-300">Lv.{getLevelFromXp(studentXp)}</span>
             </div>
           </div>
         </div>
