@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
-import { 
-  collection, 
-  onSnapshot, 
-  query, 
-  where, 
-  limit, 
-  doc, 
-  orderBy 
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  limit,
+  doc,
+  orderBy
 } from 'firebase/firestore';
 import { db, appId } from '../firebase';
 
-export default function useFirebase(currentUser) {
+export default function useFirebase(currentUser, activeStudentDetail) {
   const [data, setData] = useState({
     students: [],
     learningRecords: [],
@@ -20,12 +20,12 @@ export default function useFirebase(currentUser) {
     completionRequests: [],
     messages: [],
     sb3Files: [],
-    storageUsage: 0,
     loading: true
   });
 
-  const [storageUsage, setStorageUsage] = useState(0);
+  const [storageUsage, setStorageUsage] = useState({ isWarning: false, usedBytes: 0 });
 
+  // Main data subscriptions (re-run when user role changes)
   useEffect(() => {
     if (!currentUser) {
       setData(prev => ({ ...prev, loading: false }));
@@ -35,68 +35,74 @@ export default function useFirebase(currentUser) {
     const unsubscribers = [];
     const isStudentOrParent = currentUser.role === 'student' || currentUser.role === 'parent';
     const isStudent = currentUser.role === 'student';
-    const studentIdCtx = isStudentOrParent 
-      ? (currentUser.role === 'student' ? currentUser.studentId : currentUser.childId) 
+    const isAdmin = currentUser.role === 'admin';
+    const studentIdCtx = isStudentOrParent
+      ? (currentUser.role === 'student' ? currentUser.studentId : currentUser.childId)
       : null;
 
-    // --- Subscriptions ---
-    
-    // 8. SB3 Files (Student specific)
-    if (isStudent) {
-      const unsub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'students', currentUser.studentId, 'sb3_files'), (snap) => {
-        setData(prev => ({ ...prev, sb3Files: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
-      });
-      unsubscribers.push(unsub);
-    }
+    let resolvedCount = 0;
+    const TOTAL_SUBSCRIPTIONS = isStudent ? 8 : isAdmin ? 7 : 7;
+    const onResolved = () => {
+      resolvedCount++;
+      if (resolvedCount >= TOTAL_SUBSCRIPTIONS) {
+        setData(prev => ({ ...prev, loading: false }));
+      }
+    };
 
     // 1. Students
     if (isStudentOrParent) {
       const unsub = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'students', studentIdCtx), (docSnap) => {
-        setData(prev => ({ 
-          ...prev, 
-          students: docSnap.exists() ? [{ id: docSnap.id, ...docSnap.data() }] : [] 
+        setData(prev => ({
+          ...prev,
+          students: docSnap.exists() ? [{ id: docSnap.id, ...docSnap.data() }] : []
         }));
+        onResolved();
       });
       unsubscribers.push(unsub);
-    } else if (currentUser.role === 'admin') {
+    } else if (isAdmin) {
       const unsub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'students'), (snap) => {
         setData(prev => ({ ...prev, students: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
+        onResolved();
       });
       unsubscribers.push(unsub);
     }
 
-    // 2. Announcements (Everyone needs this)
+    // 2. Announcements
     const unsubAnnounce = onSnapshot(
-      query(collection(db, 'artifacts', appId, 'public', 'data', 'announcements'), orderBy('createdAt', 'desc'), limit(50)), 
+      query(collection(db, 'artifacts', appId, 'public', 'data', 'announcements'), orderBy('createdAt', 'desc'), limit(50)),
       (snap) => {
         setData(prev => ({ ...prev, announcements: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
+        onResolved();
       }
     );
     unsubscribers.push(unsubAnnounce);
 
     // 3. Learning Records
     const learningQuery = isStudentOrParent
-      ? query(collection(db, 'artifacts', appId, 'public', 'data', 'learning_records'), where('studentId', '==', studentIdCtx), limit(50))
-      : query(collection(db, 'artifacts', appId, 'public', 'data', 'learning_records'), limit(100)); // Admin sees more
+      ? query(collection(db, 'artifacts', appId, 'public', 'data', 'learning_records'), where('studentId', '==', studentIdCtx), orderBy('createdAt', 'desc'), limit(100))
+      : query(collection(db, 'artifacts', appId, 'public', 'data', 'learning_records'), orderBy('createdAt', 'desc'), limit(200));
     const unsubLearning = onSnapshot(learningQuery, (snap) => {
       setData(prev => ({ ...prev, learningRecords: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
+      onResolved();
     });
     unsubscribers.push(unsubLearning);
 
     // 4. Materials
     const unsubMaterials = onSnapshot(
-      query(collection(db, 'artifacts', appId, 'public', 'data', 'materials'), orderBy('createdAt', 'desc')), 
+      query(collection(db, 'artifacts', appId, 'public', 'data', 'materials'), orderBy('createdAt', 'desc')),
       (snap) => {
         setData(prev => ({ ...prev, materials: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
+        onResolved();
       }
     );
     unsubscribers.push(unsubMaterials);
 
     // 5. Reflection Template
     const unsubReflections = onSnapshot(
-      query(collection(db, 'artifacts', appId, 'public', 'data', 'reflection_template'), orderBy('createdAt', 'asc')), 
+      query(collection(db, 'artifacts', appId, 'public', 'data', 'reflection_template'), orderBy('order', 'asc')),
       (snap) => {
         setData(prev => ({ ...prev, reflectionTemplate: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
+        onResolved();
       }
     );
     unsubscribers.push(unsubReflections);
@@ -107,26 +113,59 @@ export default function useFirebase(currentUser) {
       : collection(db, 'artifacts', appId, 'public', 'data', 'completion_requests');
     const unsubCompletion = onSnapshot(completionQuery, (snap) => {
       setData(prev => ({ ...prev, completionRequests: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
+      onResolved();
     });
     unsubscribers.push(unsubCompletion);
 
     // 7. Messages
     const msgsQuery = isStudentOrParent
-      ? query(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), where('studentId', '==', studentIdCtx), limit(50))
-      : query(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), limit(100));
+      ? query(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), where('studentId', '==', studentIdCtx), orderBy('createdAt', 'asc'), limit(100))
+      : query(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), orderBy('createdAt', 'asc'), limit(200));
     const unsubMessages = onSnapshot(msgsQuery, (snap) => {
-      setData(prev => ({ 
-        ...prev, 
-        messages: snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)),
+      setData(prev => ({
+        ...prev,
+        messages: snap.docs.map(d => ({ id: d.id, ...d.data() })),
         loading: false
       }));
+      onResolved();
     });
     unsubscribers.push(unsubMessages);
+
+    // 8. Student's own sb3 files
+    if (isStudent) {
+      const unsub = onSnapshot(
+        collection(db, 'artifacts', appId, 'public', 'data', 'students', currentUser.studentId, 'sb3_files'),
+        (snap) => {
+          setData(prev => ({ ...prev, sb3Files: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
+          onResolved();
+        }
+      );
+      unsubscribers.push(unsub);
+    }
 
     return () => {
       unsubscribers.forEach(unsub => unsub());
     };
   }, [currentUser]);
+
+  // Admin sb3Files subscription — updates when selected student changes
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'admin') return;
+    if (!activeStudentDetail) {
+      setData(prev => ({ ...prev, sb3Files: [] }));
+      return;
+    }
+    const unsub = onSnapshot(
+      collection(db, 'artifacts', appId, 'public', 'data', 'students', activeStudentDetail, 'sb3_files'),
+      (snap) => {
+        setData(prev => ({
+          ...prev,
+          sb3Files: snap.docs.map(d => ({ id: d.id, studentId: activeStudentDetail, ...d.data() }))
+        }));
+      }
+    );
+    return () => unsub();
+  }, [activeStudentDetail, currentUser]);
 
   return {
     ...data,

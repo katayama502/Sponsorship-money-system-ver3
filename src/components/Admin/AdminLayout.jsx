@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 
 import { getMaterialThumbnail } from '../../utils/materialUtils';
+import { generateCredentials } from '../../utils/authUtils';
 
 export default function AdminLayout({
   activeTab,
@@ -55,6 +56,7 @@ export default function AdminLayout({
   saveStudent,
   createTestAccount,
   deleteStudentCascade,
+  deleteAnnouncement,
   materialForm,
   setMaterialForm,
   isUploadingMaterialUpload,
@@ -116,6 +118,9 @@ export default function AdminLayout({
           </button>
         </div>
         <div className="flex-1 overflow-y-auto py-6 space-y-2 px-4">
+          <button onClick={() => { setActiveTab('dashboard'); setActiveStudentDetail(null); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'dashboard' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
+            <span className="flex items-center gap-3"><Calculator size={18} /> ダッシュボード</span>
+          </button>
           <button onClick={() => { setActiveTab('students'); setActiveStudentDetail(null); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'students' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
             <span className="flex items-center gap-3"><Users size={18} /> 受講生一覧</span>
             {(() => {
@@ -191,6 +196,145 @@ export default function AdminLayout({
             </div>
           )}
 
+          {/* ダッシュボード */}
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 text-left">
+              <header>
+                <h2 className="text-2xl font-black tracking-tight text-slate-800">ダッシュボード</h2>
+                <p className="text-sm text-slate-400 mt-1">システム全体の状況</p>
+              </header>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <button onClick={() => { setActiveTab('students'); setActiveStudentDetail(null); }} className="text-left bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:border-orange-300 hover:shadow-md transition-all group">
+                  <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center mb-3 group-hover:bg-orange-200 transition-colors">
+                    <Users size={20} className="text-orange-500" />
+                  </div>
+                  <p className="text-3xl font-black text-slate-800">{(students || []).length}</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">登録生徒数</p>
+                </button>
+
+                <button onClick={() => setActiveTab('approvals')} className="text-left bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:border-rose-300 hover:shadow-md transition-all group relative">
+                  {(completionRequests || []).filter(r => r.status === 'pending').length > 0 && (
+                    <span className="absolute top-3 right-3 bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">要対応</span>
+                  )}
+                  <div className="w-10 h-10 bg-rose-100 rounded-xl flex items-center justify-center mb-3 group-hover:bg-rose-200 transition-colors">
+                    <CheckCircle2 size={20} className="text-rose-500" />
+                  </div>
+                  <p className="text-3xl font-black text-slate-800">{(completionRequests || []).filter(r => r.status === 'pending').length}</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">承認待ち</p>
+                </button>
+
+                <button onClick={() => setActiveTab('records')} className="text-left bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:border-amber-300 hover:shadow-md transition-all group relative">
+                  {(learningRecords || []).filter(r => !r.comment).length > 0 && (
+                    <span className="absolute top-3 right-3 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">要対応</span>
+                  )}
+                  <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center mb-3 group-hover:bg-amber-200 transition-colors">
+                    <FileText size={20} className="text-amber-500" />
+                  </div>
+                  <p className="text-3xl font-black text-slate-800">{(learningRecords || []).filter(r => !r.comment).length}</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">未コメント</p>
+                </button>
+
+                <button onClick={() => setActiveTab('students')} className="text-left bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-md transition-all group">
+                  <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center mb-3 group-hover:bg-slate-200 transition-colors">
+                    <MessageSquare size={20} className="text-slate-500" />
+                  </div>
+                  <p className="text-3xl font-black text-slate-800">{(students || []).filter(s => { const m = (messages || []).filter(msg => msg.studentId === s.id); return m.length > 0 && m[m.length - 1].senderId !== 'admin'; }).length}</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">新着メッセージ</p>
+                </button>
+              </div>
+
+              {/* Two-column panels */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* 未コメント提出シート */}
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-black text-slate-800 flex items-center gap-2"><FileText size={16} className="text-amber-500" /> 未コメントの提出シート</h3>
+                    <button onClick={() => setActiveTab('records')} className="text-xs font-bold text-orange-500 hover:underline">すべて見る →</button>
+                  </div>
+                  <div className="space-y-2">
+                    {(learningRecords || []).filter(r => !r.comment).slice(0, 5).map(record => (
+                      <div key={record.id} className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-100">
+                        <div className="min-w-0 mr-2">
+                          <p className="text-xs font-black text-slate-700">{record.studentName}</p>
+                          <p className="text-[10px] text-slate-400 truncate">{record.title}</p>
+                        </div>
+                        <span className={`shrink-0 text-[9px] font-black px-2 py-0.5 rounded-full ${record.recordType === 'goal' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600'}`}>
+                          {record.recordType === 'goal' ? '目標' : '振り返り'}
+                        </span>
+                      </div>
+                    ))}
+                    {(learningRecords || []).filter(r => !r.comment).length === 0 && (
+                      <div className="py-8 text-center text-slate-400 text-xs font-bold">
+                        <CheckCircle2 size={32} className="mx-auto mb-2 text-emerald-300" />
+                        未コメントの提出はありません
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 承認待ちカリキュラム */}
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-black text-slate-800 flex items-center gap-2"><CheckCircle2 size={16} className="text-rose-500" /> 承認待ちカリキュラム</h3>
+                    <button onClick={() => setActiveTab('approvals')} className="text-xs font-bold text-orange-500 hover:underline">すべて見る →</button>
+                  </div>
+                  <div className="space-y-2">
+                    {(completionRequests || []).filter(r => r.status === 'pending').slice(0, 5).map(req => {
+                      const material = (materials || []).find(m => m.id === req.materialId);
+                      return (
+                        <div key={req.id} className="flex items-center justify-between p-3 bg-rose-50 rounded-xl border border-rose-100">
+                          <div className="min-w-0 mr-2">
+                            <p className="text-xs font-black text-slate-700">{req.studentName}</p>
+                            <p className="text-[10px] text-slate-400 truncate">{material ? material.title : '不明な教材'}</p>
+                          </div>
+                          <span className="shrink-0 text-[9px] font-black bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full">承認待ち</span>
+                        </div>
+                      );
+                    })}
+                    {(completionRequests || []).filter(r => r.status === 'pending').length === 0 && (
+                      <div className="py-8 text-center text-slate-400 text-xs font-bold">
+                        <CheckCircle2 size={32} className="mx-auto mb-2 text-emerald-300" />
+                        承認待ちはありません
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 生徒一覧クイックアクセス */}
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-black text-slate-800 flex items-center gap-2"><Users size={16} className="text-orange-500" /> 受講生</h3>
+                  <button onClick={() => { setActiveTab('students'); setActiveStudentDetail(null); }} className="text-xs font-bold text-orange-500 hover:underline">管理画面へ →</button>
+                </div>
+                {(students || []).length === 0 ? (
+                  <p className="text-center text-slate-400 text-xs font-bold py-6">まだ生徒が登録されていません</p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {(students || []).map(s => {
+                      const studentMsgs = (messages || []).filter(m => m.studentId === s.id);
+                      const hasUnread = studentMsgs.length > 0 && studentMsgs[studentMsgs.length - 1].senderId !== 'admin';
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => { setActiveTab('students'); setActiveStudentDetail(s.id); }}
+                          className="relative p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-orange-300 hover:bg-orange-50 transition-all text-left"
+                        >
+                          {hasUnread && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 rounded-full"></span>}
+                          <div className="w-8 h-8 bg-orange-100 rounded-xl flex items-center justify-center mb-2 text-orange-600 font-black text-sm">{s.name?.[0] || '?'}</div>
+                          <p className="text-xs font-black text-slate-800 truncate">{s.name}</p>
+                          <p className="text-[9px] text-slate-400 truncate">{s.school || '学校未登録'}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* カリキュラム承認 */}
           {activeTab === 'approvals' && (
             <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500 text-left">
@@ -248,28 +392,6 @@ export default function AdminLayout({
                 <button onClick={createTestAccount} className="bg-amber-100 hover:bg-amber-200 text-amber-600 px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 border border-amber-300 shadow-sm transition-all"><Sparkles size={14}/> ガチャテスト用アカウント作成 (10000pt)</button>
               </header>
 
-              {/* クイックアクション */}
-              <div className="bg-white rounded-3xl border border-slate-200 p-5 shadow-sm">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">クイックアクション</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100">
-                    <p className="text-3xl font-black text-orange-500">{(students || []).length}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">登録生徒数</p>
-                  </div>
-                  <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100">
-                    <p className="text-3xl font-black text-rose-500">{(completionRequests || []).filter(r => r.status === 'pending').length}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">承認待ち</p>
-                  </div>
-                  <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100">
-                    <p className="text-3xl font-black text-emerald-500">{(learningRecords || []).filter(r => !r.comment).length}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">未コメント</p>
-                  </div>
-                  <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100">
-                    <p className="text-3xl font-black text-slate-600">{(students || []).filter(s => { const m = (messages || []).filter(msg => msg.studentId === s.id); return m.length > 0 && m[m.length - 1].senderId !== 'admin'; }).length}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">新着メッセージ</p>
-                  </div>
-                </div>
-              </div>
               {generatedCreds && (
                 <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-2xl space-y-4 border-2 border-orange-500 animate-in zoom-in-95 duration-300 text-left">
                   <div className="flex items-center gap-3 text-orange-400 font-bold text-left"><Key size={20} /> <span className="text-left">アカウントを発行しました: {generatedCreds.name}様</span></div>
@@ -318,7 +440,10 @@ export default function AdminLayout({
                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4 text-left">
                       <div className="flex justify-between items-center">
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">ログイン情報</span>
-                        <button type="button" onClick={() => {/* Pass generator function or implement here */}} className="text-[9px] bg-slate-200 px-2 py-1 rounded font-black text-slate-500 uppercase tracking-widest hover:bg-slate-300">Auto</button>
+                        <button type="button" onClick={() => {
+                          const c = generateCredentials(studentForm.name);
+                          setStudentForm(prev => ({ ...prev, studentLoginId: c.student.id, studentPassword: c.student.pw, parentLoginId: c.parent.id, parentPassword: c.parent.pw }));
+                        }} className="text-[9px] bg-slate-200 px-2 py-1 rounded font-black text-slate-500 uppercase tracking-widest hover:bg-slate-300">Auto</button>
                       </div>
 
                       {/* Student credentials */}
@@ -665,7 +790,7 @@ export default function AdminLayout({
                         <h4 className="font-black text-lg text-left text-slate-800">{notice.title}</h4>
                         <p className="text-sm text-slate-500 mt-2 leading-relaxed text-left">{notice.content}</p>
                       </div>
-                      <button aria-label={`「${notice.title}」を削除`} onClick={() => {/* Pass delete logic */}} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all shrink-0 text-left"><Trash2 size={18} /></button>
+                      <button aria-label={`「${notice.title}」を削除`} onClick={() => deleteAnnouncement(notice.id)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all shrink-0 text-left"><Trash2 size={18} /></button>
                     </div>
                   ))}
                 </div>
