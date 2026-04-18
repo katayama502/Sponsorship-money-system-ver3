@@ -25,7 +25,6 @@ import {
   Check
 } from 'lucide-react';
 
-import { getMaterialThumbnail } from '../../utils/materialUtils';
 import { generateCredentials } from '../../utils/authUtils';
 
 export default function AdminLayout({
@@ -677,18 +676,7 @@ export default function AdminLayout({
                           Scratchのサムネイルは自動設定されるため入力不要です
                         </div>
                       </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left block">サムネイル画像URL</label>
-                        <div className="flex gap-2">
-                          <input type="url" placeholder="サムネイル画像URL (任意)" value={materialForm.thumbnailUrl || ''} onChange={e => setMaterialForm({ ...materialForm, thumbnailUrl: e.target.value })} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-left outline-none focus:ring-2 focus:ring-orange-500" />
-                          <label className={`shrink-0 cursor-pointer flex items-center justify-center p-2.5 rounded-xl border border-slate-200 transition-colors ${isUploadingMaterialThumbnail ? 'bg-slate-100 text-slate-400 pointer-events-none' : 'bg-white hover:bg-slate-50 text-slate-600 hover:text-orange-600'}`} title="サムネイル画像のアップロード">
-                             {isUploadingMaterialThumbnail ? <Loader2 size={18} className="animate-spin" /> : <ImageIcon size={18} />}
-                             <input type="file" accept="image/*" className="hidden" onChange={(e) => uploadMaterialFile(e, 'thumbnail')} />
-                          </label>
-                        </div>
-                      </div>
-                    )}
+                    ) : null}
 
                     <div className="space-y-1">
                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left block">ダウンロード素材URL</label>
@@ -737,17 +725,21 @@ export default function AdminLayout({
                           </div>
                         )}
                         {filtered.map(m => (
-                          <div key={m.id} className={`bg-white p-6 rounded-3xl border ${m.isPublished === false ? 'border-dashed border-slate-300 opacity-60' : 'border-slate-200'} flex justify-between items-start group shadow-sm text-left hover:border-orange-200 transition-all`}>
-                            <div className="flex gap-4">
-                              <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 relative">
-                                 {m.isPublished === false && <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center"><span className="text-[9px] font-black text-white bg-slate-900 px-2 py-0.5 rounded-full uppercase tracking-widest">非公開</span></div>}
-                                 <img src={m.thumbnailUrl || getMaterialThumbnail(m.category)} alt="" className="w-full h-full object-cover" />
+                          <div key={m.id} className={`bg-white px-5 py-4 rounded-2xl border ${m.isPublished === false ? 'border-dashed border-slate-300 opacity-60' : 'border-slate-200'} flex justify-between items-center group shadow-sm text-left hover:border-orange-200 transition-all`}>
+                            <div className="flex items-center gap-4 min-w-0">
+                              <div className="shrink-0 flex flex-col gap-1.5">
+                                <span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">{m.category}</span>
+                                {m.isPublished === false && <span className="bg-slate-800 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">非公開</span>}
+                                {m.downloadUrl && <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center gap-1"><Download size={9} /> DL</span>}
                               </div>
-                              <div className="text-left"><h4 className="font-black text-slate-800 text-lg text-left break-all">{m.title}</h4><div className="flex flex-wrap gap-2 mt-2 text-left"><span className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter text-left">{m.category}</span>{m.downloadUrl && <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center gap-1"><Download size={9} /> DLあり</span>}</div><a href={m.url} target="_blank" className="text-orange-600 text-xs font-black flex items-center gap-1 mt-4 hover:underline text-left uppercase truncate max-w-full">Open <LinkIcon size={12} /></a></div>
+                              <div className="min-w-0">
+                                <h4 className="font-black text-slate-800 text-base break-all">{m.title}</h4>
+                                <a href={m.url} target="_blank" rel="noreferrer" className="text-orange-600 text-xs font-black flex items-center gap-1 mt-1 hover:underline uppercase truncate max-w-xs">Open <LinkIcon size={11} /></a>
+                              </div>
                             </div>
-                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all text-left">
-                              <button aria-label={`${m.title}を編集`} onClick={() => { setEditingMaterial(m); setMaterialForm({ ...m, category: m.category || 'scratch', thumbnailUrl: m.thumbnailUrl || '', downloadUrl: m.downloadUrl || '', isPublished: m.isPublished !== false }); window.scrollTo(0,0); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 transition-colors"><Edit2 size={14} /></button>
-                              <button aria-label={`${m.title}を削除`} onClick={() => deleteMaterial(m.id)} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={14} /></button>
+                            <div className="flex gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
+                              <button aria-label={`${m.title}を編集`} onClick={() => { setEditingMaterial(m); setMaterialForm({ ...m, category: m.category || 'scratch', thumbnailUrl: m.thumbnailUrl || '', downloadUrl: m.downloadUrl || '', isPublished: m.isPublished !== false }); window.scrollTo(0,0); }} className="p-2 bg-slate-50 text-slate-400 hover:text-orange-600 transition-colors rounded-lg"><Edit2 size={14} /></button>
+                              <button aria-label={`${m.title}を削除`} onClick={() => deleteMaterial(m.id)} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 transition-colors rounded-lg"><Trash2 size={14} /></button>
                             </div>
                           </div>
                         ))}

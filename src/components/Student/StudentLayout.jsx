@@ -30,7 +30,7 @@ import TypingGame from '../TypingGame';
 import GachaSystem from '../GachaSystem';
 import { GACHA_ITEMS } from '../../data/items';
 import { getLevelCharacter, getXpInfo, getLevelFromXp, XP_CUMULATIVE } from '../../utils/xpUtils';
-import { getMaterialThumbnail, getYoutubeEmbedUrl } from '../../utils/materialUtils';
+import { getYoutubeEmbedUrl } from '../../utils/materialUtils';
 
 export default function StudentLayout({
   currentUser,
@@ -1128,22 +1128,23 @@ export default function StudentLayout({
                         const isScratch = m.category === 'scratch' || (m.tags && m.tags.some(t => t.toLowerCase() === 'scratch'));
                         const isCompleted = studentData?.completedMaterials?.includes(m.id) || false;
                         return (
-                          <div key={m.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden group shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col">
-                            <div className="relative h-36 overflow-hidden cursor-pointer bg-slate-100" onClick={(e) => handleMaterialOpen(e, m)}>
-                              <img src={m.thumbnailUrl || getMaterialThumbnail(m.category)} alt={m.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                                {isYoutube ? <PlayCircle size={44} className="text-white drop-shadow-lg" /> : <LinkIcon size={36} className="text-white drop-shadow-lg" />}
-                              </div>
-                              <div className="absolute top-2 left-2">
-                                <span className={`text-[9px] shadow-sm font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${isYoutube ? 'bg-red-500 text-white' : isScratch ? 'bg-orange-500 text-white' : 'bg-slate-800 text-white'}`}>
+                          <div key={m.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 flex flex-col">
+                            <div className="p-4 flex-1 flex flex-col gap-3">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${isYoutube ? 'bg-red-100 text-red-600' : isScratch ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-600'}`}>
                                   {isYoutube ? 'YouTube' : isScratch ? 'Scratch' : 'Web'}
                                 </span>
+                                {isCompleted && <CheckCircle2 size={14} className="text-emerald-500" />}
                               </div>
-                            </div>
-                            <div className="p-4 flex-1 flex flex-col">
-                              <h4 className="font-black text-slate-800 text-sm mb-3 flex-1 cursor-pointer hover:text-orange-600 transition-colors line-clamp-2" onClick={(e) => handleMaterialOpen(e, m)}>
+                              <h4 className="font-black text-slate-800 text-sm flex-1 cursor-pointer hover:text-orange-600 transition-colors line-clamp-3 leading-snug" onClick={(e) => handleMaterialOpen(e, m)}>
                                 {m.title}
                               </h4>
+                              <button
+                                onClick={(e) => handleMaterialOpen(e, m)}
+                                className="w-full py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs font-black border border-slate-200 text-slate-500 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-600 transition-all"
+                              >
+                                <PlayCircle size={14} /> ひらく
+                              </button>
                               {isStudent && (() => {
                                 const studentReqs = completionRequests.filter(r => r.studentId === currentUser.studentId && r.materialId === m.id);
                                 const hasPending = studentReqs.some(r => r.status === 'pending');
