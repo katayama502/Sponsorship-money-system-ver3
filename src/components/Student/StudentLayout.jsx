@@ -71,6 +71,7 @@ export default function StudentLayout({
 }) {
   const [isSubmittingComplete, setIsSubmittingComplete] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
+  const [showOnlyUncommented, setShowOnlyUncommented] = useState(false);
   const prevLevelRef = useRef(null);
   const msgEndRef = useRef(null);
 
@@ -885,8 +886,6 @@ export default function StudentLayout({
             });
 
           const uncommentedByParent = allRecords.filter(r => !r.parentComment);
-          // For parent: show filter toggle; for student: always show all
-          const [showOnlyUncommented, setShowOnlyUncommented] = React.useState(false);
           const myRecords = (isParent && showOnlyUncommented) ? uncommentedByParent : allRecords;
 
           const grouped = {};
