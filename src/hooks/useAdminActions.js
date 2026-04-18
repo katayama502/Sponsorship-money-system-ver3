@@ -1,22 +1,23 @@
+import { useRef } from 'react';
 import { db, storage } from '../firebase';
-import { 
-  doc, 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  writeBatch, 
+import {
+  doc,
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  writeBatch,
   serverTimestamp,
   getDoc,
   getDocs,
   query,
   where
 } from 'firebase/firestore';
-import { 
-  ref, 
-  uploadBytes, 
-  getDownloadURL, 
-  deleteObject 
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject
 } from 'firebase/storage';
 import { generateCredentials } from '../utils/authUtils';
 
@@ -45,7 +46,8 @@ export default function useAdminActions({
   setIsUploadingMaterialThumbnail
 }) {
   // Tracks which admin comment record IDs are currently submitting (XP spam prevention)
-  const submittingComments = new Set();
+  // useRef to persist the Set across re-renders without triggering re-renders itself
+  const submittingComments = useRef(new Set());
 
   const saveStudent = async (e) => {
     e.preventDefault();
@@ -98,20 +100,31 @@ export default function useAdminActions({
   };
 
   const deleteStudentCascade = async (studentId) => {
-    if (!window.confirm('この受講生を削除しますか？学習記録やメッセージもすべて削除されます。')) return;
+    if (!window.confirm('この受講生を削除しますか？学習記録・メッセージ・ファイルもすべて削除されます。')) return;
     try {
       const batch = writeBatch(db);
       batch.delete(doc(db, 'artifacts', appId, 'public', 'data', 'students', studentId));
-      
-      // Messages to/from student
-      const qMsgs = query(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), where('studentId', '==', studentId));
-      const snapMsgs = await getDocs(qMsgs);
+
+      // Messages
+      const snapMsgs = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), where('studentId', '==', studentId)));
       snapMsgs.forEach(d => batch.delete(d.ref));
-      
+
       // Learning records
-      const qRecs = query(collection(db, 'artifacts', appId, 'public', 'data', 'learning_records'), where('studentId', '==', studentId));
-      const snapRecs = await getDocs(qRecs);
+      const snapRecs = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'learning_records'), where('studentId', '==', studentId)));
       snapRecs.forEach(d => batch.delete(d.ref));
+
+      // Completion requests
+      const snapReqs = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'completion_requests'), where('studentId', '==', studentId)));
+      snapReqs.forEach(d => batch.delete(d.ref));
+
+      // sb3_files subcollection — delete Storage objects first, then Firestore docs
+      const snapSb3 = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'students', studentId, 'sb3_files'));
+      await Promise.all(
+        snapSb3.docs
+          .filter(d => d.data().storagePath)
+          .map(d => deleteObject(ref(storage, d.data().storagePath)).catch(() => {}))
+      );
+      snapSb3.forEach(d => batch.delete(d.ref));
 
       await batch.commit();
       setSaveMessage('受講生を削除しました');
@@ -211,8 +224,8 @@ export default function useAdminActions({
 
   const submitAdminComment = async (recordId) => {
     const text = adminComment[recordId];
-    if (!text || submittingComments.has(recordId)) return;
-    submittingComments.add(recordId);
+    if (!text || submittingComments.current.has(recordId)) return;
+    submittingComments.current.add(recordId);
     try {
       const recordRef = doc(db, 'artifacts', appId, 'public', 'data', 'learning_records', recordId);
       const snap = await getDoc(recordRef);
@@ -240,7 +253,7 @@ export default function useAdminActions({
       });
       setSaveMessage(data.commentPointed ? 'コメントを更新しました' : 'コメントとポイント(+1pt/30XP)を送信しました');
     } catch (err) { setSaveMessage('失敗'); }
-    finally { submittingComments.delete(recordId); }
+    finally { submittingComments.current.delete(recordId); }
     setTimeout(() => setSaveMessage(''), 3000);
   };
 
@@ -272,6 +285,15 @@ export default function useAdminActions({
     setTimeout(() => setSaveMessage(''), 3000);
   };
 
+  const deleteAnnouncement = async (id) => {
+    if (!window.confirm('このお知らせを削除しますか？')) return;
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'announcements', id));
+      setSaveMessage('お知らせを削除しました');
+    } catch (err) { setSaveMessage('削除失敗'); }
+    setTimeout(() => setSaveMessage(''), 3000);
+  };
+
   const rejectCompletion = async (requestId) => {
     if (!window.confirm('差し戻しますか？')) return;
     try {
@@ -291,6 +313,7 @@ export default function useAdminActions({
     saveMaterial,
     deleteMaterial,
     postAnnouncement,
+    deleteAnnouncement,
     saveReflectionItem,
     deleteReflectionItem,
     submitAdminComment,

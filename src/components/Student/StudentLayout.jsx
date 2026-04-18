@@ -20,12 +20,13 @@ import {
   CheckCircle2,
   Menu
 } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { Loader2 } from 'lucide-react';
 import { db, appId } from '../../firebase';
 import TypingGame from '../TypingGame';
 import GachaSystem from '../GachaSystem';
 import { GACHA_ITEMS } from '../../data/items';
-import { getLevelCharacter, getXpInfo, XP_CUMULATIVE } from '../../utils/xpUtils';
+import { getLevelCharacter, getXpInfo, getLevelFromXp, XP_CUMULATIVE } from '../../utils/xpUtils';
 import { getMaterialThumbnail, getYoutubeEmbedUrl } from '../../utils/materialUtils';
 
 export default function StudentLayout({
@@ -62,7 +63,8 @@ export default function StudentLayout({
   toggleMaterialComplete,
   completionRequests,
   MATERIAL_CATEGORIES,
-  isSendingMessage
+  isSendingMessage,
+  reflectionTemplate
 }) {
   // --- Local state ---
   const [isSubmittingComplete, setIsSubmittingComplete] = useState(false);
@@ -75,16 +77,7 @@ export default function StudentLayout({
       ? students.find(s => s.id === currentUser.studentId)
       : students.find(s => s.id === currentUser.childId);
     const studentXp = loggedInStudent?.xp || 0;
-    const { level } = (() => {
-      let lv = 1;
-      const XP_PER_LEVEL = 100;
-      let cumulative = 0;
-      const xpThresholds = [0,100,220,360,520,700,900,1120,1360,1620,1900,2200,2520,2860,3220,3600,4000,4420,4860,5320];
-      for (let i = 0; i < xpThresholds.length; i++) {
-        if (studentXp >= xpThresholds[i]) lv = i + 1; else break;
-      }
-      return { level: Math.min(lv, 20) };
-    })();
+    const level = getLevelFromXp(studentXp);
     if (prevLevelRef.current !== null && level > prevLevelRef.current) {
       setShowLevelUp(true);
       const timer = setTimeout(() => setShowLevelUp(false), 4000);
@@ -587,7 +580,7 @@ export default function StudentLayout({
                 <p role="alert" className="text-sm text-slate-400 text-center py-6 font-medium">まだお知らせはありません</p>
               ) : (
                 <div className="space-y-3">
-                  {announcements.slice().reverse().map(a => {
+                  {announcements.map(a => {
                     const isUnread = !readAnnouncementIds.includes(a.id);
                     return (
                       <div key={a.id} className={`rounded-2xl px-5 py-4 border flex items-start gap-3 ${isUnread ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-100'}`}>
@@ -649,15 +642,29 @@ export default function StudentLayout({
                   </div>
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">タイトル（{newLearningRecord.recordType === 'goal' ? 'もくひょうのタイトル' : 'ふりかえりのタイトル'}）</label>
-                    <input type="text" value={newLearningRecord.title} onChange={e => setNewLearningRecord({ ...newLearningRecord, title: e.target.value })} className={`w-full bg-slate-50 border rounded-2xl px-5 py-4 text-base font-bold outline-none transition-all ${newLearningRecord.recordType === 'goal' ? 'border-emerald-100 focus:ring-emerald-500' : 'border-slate-200 focus:ring-orange-500'}`} placeholder={newLearningRecord.recordType === 'goal' ? "れい: きょうはScratchでゲームをかんせいさせる！" : "れい: Scratchでアニメーションをつくった！"} required />
+                    <input type="text" value={newLearningRecord.title} onChange={e => setNewLearningRecord({ ...newLearningRecord, title: e.target.value })} className={`w-full bg-slate-50 border rounded-2xl px-5 py-4 text-base font-bold outline-none transition-all ${newLearningRecord.recordType === 'goal' ? 'border-emerald-100 focus:ring-2 focus:ring-emerald-500' : 'border-slate-200 focus:ring-2 focus:ring-orange-500'}`} placeholder={newLearningRecord.recordType === 'goal' ? "れい: きょうはScratchでゲームをかんせいさせる！" : "れい: Scratchでアニメーションをつくった！"} required />
                   </div>
-                  {learningRecords.length >= 0 && (() => {
-                    const template = learningRecords[0]?.template || []; // In real scenario, template is passed
-                    // Using fallback or passed template logic
-                    return null;
-                  })()}
-                  {/* Handle template fields */}
-                  {/* Note: In target components, ensure template is passed or accessible */}
+
+                  {/* テンプレートフィールド (管理者が設定した質問項目) */}
+                  {(reflectionTemplate || [])
+                    .filter(item => (item.category || 'goal') === (newLearningRecord.recordType || 'goal'))
+                    .map(item => (
+                      <div key={item.id}>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">{item.title}</label>
+                        <textarea
+                          value={(newLearningRecord.content || {})[item.id] || ''}
+                          onChange={e => setNewLearningRecord({
+                            ...newLearningRecord,
+                            content: { ...(newLearningRecord.content || {}), [item.id]: e.target.value }
+                          })}
+                          placeholder={`${item.title}をかいてみよう！`}
+                          rows={3}
+                          className={`w-full bg-slate-50 border rounded-2xl px-5 py-3 text-sm font-medium outline-none resize-none transition-all ${newLearningRecord.recordType === 'goal' ? 'border-emerald-100 focus:ring-2 focus:ring-emerald-500' : 'border-slate-200 focus:ring-2 focus:ring-orange-500'}`}
+                        />
+                      </div>
+                    ))
+                  }
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">つくったものの画像URL（なくてもOK）</label>

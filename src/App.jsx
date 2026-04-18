@@ -106,7 +106,7 @@ const App = () => {
   const [authError, setAuthError] = useState('');
 
   // --- UI State ---
-  const [activeTab, setActiveTab] = useState('students');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [saveMessage, setSaveMessage] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [previewModal, setPreviewModal] = useState(null);
@@ -127,7 +127,7 @@ const App = () => {
     storageUsage,
     setStorageUsage,
     loading
-  } = useFirebase(currentUser, appId);
+  } = useFirebase(currentUser, activeStudentDetail);
 
 
   // --- Form States ---
@@ -209,7 +209,7 @@ const App = () => {
     const markMessagesAsRead = async () => {
       let unreadMsgs = [];
       if (currentUser.role === 'admin' && activeStudentDetail) {
-        unreadMsgs = messages.filter(m => m.studentId === activeStudentDetail.id && m.receiverId === 'admin' && !m.isRead);
+        unreadMsgs = messages.filter(m => m.studentId === activeStudentDetail && m.receiverId === 'admin' && !m.isRead);
       } else if ((currentUser.role === 'student' || currentUser.role === 'parent') && activeTab === 'mypage') {
         const studentIdCtx = currentUser.role === 'student' ? currentUser.studentId : currentUser.childId;
         unreadMsgs = messages.filter(m => m.studentId === studentIdCtx && m.receiverId === studentIdCtx && !m.isRead);
@@ -250,7 +250,7 @@ const App = () => {
     setAuthError('');
     if (loginId === 'admin' && password === 'admin123') {
       setCurrentUser({ role: 'admin', name: 'システム管理者' });
-      setActiveTab('students');
+      setActiveTab('dashboard');
       return;
     }
     const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'students'));
@@ -451,6 +451,8 @@ const App = () => {
           studentSearchQuery={studentSearchQuery}
           setStudentSearchQuery={setStudentSearchQuery}
           MATERIAL_CATEGORIES={MATERIAL_CATEGORIES}
+          isUploadingMaterialUpload={isUploadingMaterialUpload}
+          isUploadingMaterialThumbnail={isUploadingMaterialThumbnail}
         />
       ) : (
         <StudentLayout
@@ -488,6 +490,7 @@ const App = () => {
           toggleMaterialComplete={toggleMaterialComplete}
           completionRequests={completionRequests}
           MATERIAL_CATEGORIES={MATERIAL_CATEGORIES}
+          reflectionTemplate={reflectionTemplate}
         />
       )}
       <PreviewModal previewModal={previewModal} setPreviewModal={setPreviewModal} />
