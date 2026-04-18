@@ -114,6 +114,9 @@ const App = () => {
   const [splitRatio, setSplitRatio] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
 
+  // --- must be declared before useFirebase ---
+  const [activeStudentDetail, setActiveStudentDetail] = useState(null);
+
   // --- Data States (Managed by hook for performance) ---
   const {
     students,
@@ -132,7 +135,6 @@ const App = () => {
 
   // --- Form States ---
   const [editingStudent, setEditingStudent] = useState(null);
-  const [activeStudentDetail, setActiveStudentDetail] = useState(null);
   const [studentForm, setStudentForm] = useState({
     name: '', school: '', age: '', remarks: '', nextClassDate: '',
     studentLoginId: '', studentPassword: '', parentLoginId: '', parentPassword: '',
