@@ -49,6 +49,11 @@ export default function useFirebase(currentUser, activeStudentDetail) {
       }
     };
 
+    const errHandler = (err) => {
+      console.error('[useFirebase] onSnapshot error:', err.message);
+      onResolved(); // unblock loading even on error
+    };
+
     // 1. Students
     if (isStudentOrParent) {
       const unsub = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'students', studentIdCtx), (docSnap) => {
@@ -57,13 +62,13 @@ export default function useFirebase(currentUser, activeStudentDetail) {
           students: docSnap.exists() ? [{ id: docSnap.id, ...docSnap.data() }] : []
         }));
         onResolved();
-      });
+      }, errHandler);
       unsubscribers.push(unsub);
     } else if (isAdmin) {
       const unsub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'students'), (snap) => {
         setData(prev => ({ ...prev, students: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
         onResolved();
-      });
+      }, errHandler);
       unsubscribers.push(unsub);
     }
 
@@ -73,7 +78,7 @@ export default function useFirebase(currentUser, activeStudentDetail) {
       (snap) => {
         setData(prev => ({ ...prev, announcements: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
         onResolved();
-      }
+      }, errHandler
     );
     unsubscribers.push(unsubAnnounce);
 
@@ -84,7 +89,7 @@ export default function useFirebase(currentUser, activeStudentDetail) {
     const unsubLearning = onSnapshot(learningQuery, (snap) => {
       setData(prev => ({ ...prev, learningRecords: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
       onResolved();
-    });
+    }, errHandler);
     unsubscribers.push(unsubLearning);
 
     // 4. Materials
@@ -93,7 +98,7 @@ export default function useFirebase(currentUser, activeStudentDetail) {
       (snap) => {
         setData(prev => ({ ...prev, materials: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
         onResolved();
-      }
+      }, errHandler
     );
     unsubscribers.push(unsubMaterials);
 
@@ -103,7 +108,7 @@ export default function useFirebase(currentUser, activeStudentDetail) {
       (snap) => {
         setData(prev => ({ ...prev, reflectionTemplate: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
         onResolved();
-      }
+      }, errHandler
     );
     unsubscribers.push(unsubReflections);
 
@@ -114,7 +119,7 @@ export default function useFirebase(currentUser, activeStudentDetail) {
     const unsubCompletion = onSnapshot(completionQuery, (snap) => {
       setData(prev => ({ ...prev, completionRequests: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
       onResolved();
-    });
+    }, errHandler);
     unsubscribers.push(unsubCompletion);
 
     // 7. Messages
@@ -128,7 +133,7 @@ export default function useFirebase(currentUser, activeStudentDetail) {
         loading: false
       }));
       onResolved();
-    });
+    }, errHandler);
     unsubscribers.push(unsubMessages);
 
     // 8. Student's own sb3 files
@@ -138,7 +143,7 @@ export default function useFirebase(currentUser, activeStudentDetail) {
         (snap) => {
           setData(prev => ({ ...prev, sb3Files: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
           onResolved();
-        }
+        }, errHandler
       );
       unsubscribers.push(unsub);
     }

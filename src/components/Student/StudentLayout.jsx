@@ -73,6 +73,7 @@ export default function StudentLayout({
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [showOnlyUncommented, setShowOnlyUncommented] = useState(false);
   const [materialSearch, setMaterialSearch] = useState('');
+  const [recordSubmitConfirm, setRecordSubmitConfirm] = useState(false);
   const prevLevelRef = useRef(null);
   const msgEndRef = useRef(null);
 
@@ -91,10 +92,12 @@ export default function StudentLayout({
     prevLevelRef.current = level;
   }, [students, currentUser]);
 
-  // Auto-scroll messages
+  // Auto-scroll messages (on new message count or tab switch to mypage)
   useEffect(() => {
-    if (msgEndRef.current) msgEndRef.current.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, activeTab]);
+    if (activeTab === 'mypage' && msgEndRef.current) {
+      msgEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages.length, activeTab]);
 
   const isStudent = currentUser.role === 'student';
   const isParent = currentUser.role === 'parent';
@@ -498,12 +501,14 @@ export default function StudentLayout({
                       {announcements.map(a => {
                         const isUnread = !readAnnouncementIds.includes(a.id);
                         return (
-                          <div key={a.id} className={`rounded-xl px-4 py-3 border flex items-start gap-2 ${isUnread ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-100'}`}>
+                          <div key={a.id} className={`rounded-xl px-4 py-3 border flex items-start gap-2 ${isUnread ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-100'} ${a.type === 'emergency' ? 'border-rose-300 bg-rose-50' : ''}`}>
                             {isUnread && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-orange-500 mt-1.5" />}
                             <div className="flex-1 min-w-0">
-                              <p className={`text-xs font-bold truncate ${isUnread ? 'text-slate-800' : 'text-slate-500'}`}>{a.content || a.title || a.message || ''}</p>
+                              {a.type === 'emergency' && <p className="text-[9px] font-black text-rose-600 uppercase tracking-widest mb-0.5">🚨 緊急連絡</p>}
+                              {a.title && <p className={`text-xs font-black ${isUnread ? 'text-slate-800' : 'text-slate-600'}`}>{a.title}</p>}
+                              {a.content && <p className={`text-[11px] mt-0.5 leading-relaxed line-clamp-2 ${isUnread ? 'text-slate-700' : 'text-slate-400'}`}>{a.content}</p>}
                               {a.createdAt && (
-                                <p className="text-[9px] font-bold text-slate-400 mt-0.5">
+                                <p className="text-[9px] font-bold text-slate-400 mt-1">
                                   {new Date(a.createdAt.seconds ? a.createdAt.seconds * 1000 : a.createdAt).toLocaleDateString('ja-JP')}
                                 </p>
                               )}
@@ -590,7 +595,7 @@ export default function StudentLayout({
               </button>
             </div>
 
-            <form onSubmit={submitLearningRecord} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 md:p-6 space-y-5">
+            <form onSubmit={(e) => { submitLearningRecord(e); setRecordSubmitConfirm(false); }} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 md:p-6 space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">じゅぎょうの日</label>
@@ -648,12 +653,24 @@ export default function StudentLayout({
                 </div>
               </div>
 
-              <button
-                type="submit"
-                className={`w-full text-white font-black py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-3 active:scale-95 text-sm uppercase tracking-widest ${newLearningRecord.recordType === 'goal' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-orange-600 hover:bg-orange-700'}`}
-              >
-                <Save size={18} /> {newLearningRecord.recordType === 'goal' ? 'もくひょうをほぞんする' : 'ふりかえりをほぞんする'}
-              </button>
+              {!recordSubmitConfirm ? (
+                <button
+                  type="button"
+                  onClick={() => setRecordSubmitConfirm(true)}
+                  disabled={!newLearningRecord.title?.trim()}
+                  className={`w-full text-white font-black py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-3 active:scale-95 text-sm uppercase tracking-widest ${!newLearningRecord.title?.trim() ? 'opacity-50 cursor-not-allowed bg-slate-400' : newLearningRecord.recordType === 'goal' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-orange-600 hover:bg-orange-700'}`}
+                >
+                  <Save size={18} /> {newLearningRecord.recordType === 'goal' ? 'もくひょうをほぞんする' : 'ふりかえりをほぞんする'}
+                </button>
+              ) : (
+                <div className={`rounded-2xl border-2 p-4 space-y-3 animate-in zoom-in-95 duration-200 ${newLearningRecord.recordType === 'goal' ? 'bg-emerald-50 border-emerald-300' : 'bg-orange-50 border-orange-300'}`}>
+                  <p className="text-sm font-black text-slate-700 text-center">この内容でほぞんする？</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setRecordSubmitConfirm(false)} className="py-3 rounded-xl font-black text-sm bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">もどる</button>
+                    <button type="submit" className={`py-3 rounded-xl font-black text-sm text-white transition-colors ${newLearningRecord.recordType === 'goal' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-orange-600 hover:bg-orange-700'}`}>ほぞんする！</button>
+                  </div>
+                </div>
+              )}
             </form>
 
             {/* SB3 file manager */}

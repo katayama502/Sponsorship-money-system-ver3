@@ -150,7 +150,7 @@ const App = () => {
     inventory: [], equipped: { weapon: null, armor: null, accessory: null }
   });
   const [generatedCreds, setGeneratedCreds] = useState(null);
-  const [newLearningRecord, setNewLearningRecord] = useState({ title: '', content: {}, imageUrl: '', fileUrl: '', linkUrl: '', lessonDate: new Date().toISOString().slice(0, 10) });
+  const [newLearningRecord, setNewLearningRecord] = useState({ title: '', content: {}, imageUrl: '', fileUrl: '', linkUrl: '', lessonDate: new Date().toISOString().slice(0, 10), recordType: 'goal' });
   const [adminComment, setAdminComment] = useState({});
   const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', type: 'info' });
   const [reflectionItemForm, setReflectionItemForm] = useState({ title: '', type: 'textarea', category: 'goal' });
@@ -320,16 +320,27 @@ const App = () => {
     }
   };
 
-  const handleLogout = () => { setCurrentUser(null); setLoginId(''); setPassword(''); };
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setLoginId('');
+    setPassword('');
+    setActiveTab('dashboard');
+    setEditingStudent(null);
+    setStudentForm({ name: '', school: '', age: '', remarks: '', nextClassDate: '', studentLoginId: '', studentPassword: '', parentLoginId: '', parentPassword: '', inventory: [], equipped: { weapon: null, armor: null, accessory: null } });
+    setGeneratedCreds(null);
+    setAdminComment({});
+    setNewMessage('');
+    setSaveMessage('');
+    setActiveStudentDetail(null);
+  };
 
   const submitLearningRecord = async (e) => {
     e.preventDefault();
-    if (!window.confirm('この内容で学習記録を提出しますか？')) return;
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'learning_records'), {
         ...newLearningRecord, studentId: currentUser.studentId, studentName: currentUser.name, date: new Date().toISOString(), createdAt: serverTimestamp(), comment: ''
       });
-      setNewLearningRecord({ title: '', content: {}, imageUrl: '', fileUrl: '', linkUrl: '', lessonDate: new Date().toISOString().slice(0, 10) });
+      setNewLearningRecord({ title: '', content: {}, imageUrl: '', fileUrl: '', linkUrl: '', lessonDate: new Date().toISOString().slice(0, 10), recordType: 'goal' });
       setSaveMessage('記録しました');
     } catch (e) { setSaveMessage('失敗'); }
     setTimeout(() => setSaveMessage(''), 3000);

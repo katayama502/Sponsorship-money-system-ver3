@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 
 import { generateCredentials } from '../../utils/authUtils';
+import { getLevelFromXp } from '../../utils/xpUtils';
 
 export default function AdminLayout({
   activeTab,
@@ -92,6 +93,13 @@ export default function AdminLayout({
   const [recordFilter, setRecordFilter] = useState('uncommented');
   const [recordStudentFilter, setRecordStudentFilter] = useState('');
   const [editingCommentId, setEditingCommentId] = useState(null);
+  const [approvalHistoryOpen, setApprovalHistoryOpen] = useState(false);
+
+  // Wrap setActiveTab to reset local transient state on navigation
+  const handleTabChange = (tab) => {
+    setEditingCommentId(null);
+    setActiveTab(tab);
+  };
 
   const copyToClipboard = (text, fieldKey) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -121,10 +129,10 @@ export default function AdminLayout({
           </button>
         </div>
         <div className="flex-1 overflow-y-auto py-6 space-y-2 px-4">
-          <button onClick={() => { setActiveTab('dashboard'); setActiveStudentDetail(null); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'dashboard' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
+          <button onClick={() => { handleTabChange('dashboard'); setActiveStudentDetail(null); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'dashboard' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
             <span className="flex items-center gap-3"><Calculator size={18} /> ダッシュボード</span>
           </button>
-          <button onClick={() => { setActiveTab('students'); setActiveStudentDetail(null); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'students' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
+          <button onClick={() => { handleTabChange('students'); setActiveStudentDetail(null); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'students' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
             <span className="flex items-center gap-3"><Users size={18} /> 受講生一覧</span>
             {(() => {
               const unreadCount = (students || []).filter(s => {
@@ -135,27 +143,27 @@ export default function AdminLayout({
               return unreadCount > 0 ? <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{unreadCount}</span> : null;
             })()}
           </button>
-          <button onClick={() => { setActiveTab('records'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'records' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
+          <button onClick={() => { handleTabChange('records'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'records' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
             <span className="flex items-center gap-3"><FileText size={18} /> 提出シート確認</span>
             {(() => {
               const unreadCount = (learningRecords || []).filter(r => !r.comment).length;
               return unreadCount > 0 ? <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{unreadCount}</span> : null;
             })()}
           </button>
-          <button onClick={() => { setActiveTab('materials'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'materials' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
+          <button onClick={() => { handleTabChange('materials'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'materials' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
             <span className="flex items-center gap-3"><BookOpen size={18} /> 教材リソース</span>
           </button>
-          <button onClick={() => { setActiveTab('approvals'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'approvals' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
+          <button onClick={() => { handleTabChange('approvals'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'approvals' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
             <span className="flex items-center gap-3"><CheckCircle2 size={18} /> カリキュラム承認</span>
             {(() => {
               const pendingCount = (completionRequests || []).filter(r => r.status === 'pending').length;
               return pendingCount > 0 ? <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{pendingCount}</span> : null;
             })()}
           </button>
-          <button onClick={() => { setActiveTab('reflections'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'reflections' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
+          <button onClick={() => { handleTabChange('reflections'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'reflections' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
             <span className="flex items-center gap-3"><Settings2 size={18} /> 記録フォーマット</span>
           </button>
-          <button onClick={() => { setActiveTab('notices'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'notices' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
+          <button onClick={() => { handleTabChange('notices'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'notices' ? 'bg-orange-600 text-white' : 'hover:bg-slate-800'}`}>
             <span className="flex items-center gap-3"><Megaphone size={18} /> 全体お知らせ</span>
           </button>
         </div>
@@ -180,7 +188,7 @@ export default function AdminLayout({
           </div>
         </header>
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
-          {saveMessage && <div role="alert" className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce text-left"><CheckCircle2 size={18} className="text-emerald-400" /><span className="text-sm font-bold">{saveMessage}</span></div>}
+          {saveMessage && <div role="alert" className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-300 text-left"><CheckCircle2 size={18} className="text-emerald-400 shrink-0" /><span className="text-sm font-bold">{saveMessage}</span></div>}
 
           {/* 容量アラートポップアップ */}
           {storageUsage.isWarning && (
@@ -366,9 +374,18 @@ export default function AdminLayout({
 
           {/* カリキュラム承認 */}
           {activeTab === 'approvals' && (
-            <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500 text-left">
+            <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 text-left">
               <header className="flex justify-between items-center text-left">
-                <h2 className="text-2xl font-black tracking-tight text-left">カリキュラム承認待ち一覧</h2>
+                <div>
+                  <h2 className="text-2xl font-black tracking-tight text-left">カリキュラム承認</h2>
+                  <p className="text-sm text-slate-400 mt-1">承認待ち: {(completionRequests || []).filter(req => req.status === 'pending').length}件 / 承認済み: {(completionRequests || []).filter(req => req.status === 'approved').length}件</p>
+                </div>
+                <button
+                  onClick={() => setApprovalHistoryOpen(v => !v)}
+                  className="text-xs font-black text-slate-500 hover:text-orange-600 bg-slate-100 hover:bg-orange-50 px-4 py-2 rounded-xl transition-colors border border-slate-200"
+                >
+                  {approvalHistoryOpen ? '履歴を隠す' : '承認履歴を見る'}
+                </button>
               </header>
 
               <div className="space-y-4">
@@ -380,9 +397,10 @@ export default function AdminLayout({
                         <div className="flex items-center gap-3 mb-2">
                           <span className="bg-orange-100 text-orange-600 px-3 py-1 rounded-full text-xs font-bold">{req.studentName}</span>
                           <span className="text-slate-400 text-xs">{req.createdAt?.toDate().toLocaleString('ja-JP')}</span>
+                          <span className="text-[9px] font-black bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full uppercase tracking-widest">承認待ち</span>
                         </div>
                         <h3 className="font-bold text-lg text-slate-800">
-                          教材: {material ? material.title : '不明な教材'}
+                          {material ? material.title : '不明な教材'}
                         </h3>
                       </div>
                       <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto mt-4 md:mt-0">
@@ -396,7 +414,7 @@ export default function AdminLayout({
                           onClick={() => approveCompletion(req.id, req.studentId, req.materialId)}
                           className="shrink-0 bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-md text-sm"
                         >
-                          <CheckCircle2 size={18} /> 承認する
+                          <CheckCircle2 size={18} /> 承認する (+50XP)
                         </button>
                       </div>
                     </div>
@@ -404,12 +422,39 @@ export default function AdminLayout({
                 })}
 
                 {(completionRequests || []).filter(req => req.status === 'pending').length === 0 && (
-                  <div className="py-20 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
-                    <CheckCircle2 size={48} className="mx-auto text-slate-300 mb-4" />
-                    <p className="text-slate-500 font-bold">現在、承認待ちのカリキュラムはありません。</p>
+                  <div className="py-16 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
+                    <CheckCircle2 size={40} className="mx-auto text-emerald-300 mb-3" />
+                    <p className="text-slate-600 font-black">承認待ちはありません</p>
+                    <p className="text-slate-400 text-xs mt-1">お疲れ様です！</p>
                   </div>
                 )}
               </div>
+
+              {/* 承認履歴 */}
+              {approvalHistoryOpen && (
+                <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
+                  <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest">承認・差し戻し 履歴</h3>
+                  {(completionRequests || []).filter(req => req.status !== 'pending').sort((a, b) => (b.approvedAt || b.rejectedAt)?.toMillis() - (a.approvedAt || a.rejectedAt)?.toMillis()).map(req => {
+                    const material = materials.find(m => m.id === req.materialId);
+                    const isApproved = req.status === 'approved';
+                    return (
+                      <div key={req.id} className={`flex items-center justify-between p-4 rounded-2xl border ${isApproved ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-100'}`}>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${isApproved ? 'bg-emerald-200 text-emerald-700' : 'bg-rose-200 text-rose-700'}`}>{isApproved ? '承認済み' : '差し戻し'}</span>
+                          <div>
+                            <p className="text-xs font-black text-slate-700">{req.studentName} — {material ? material.title : '不明な教材'}</p>
+                            <p className="text-[9px] text-slate-400">{(req.approvedAt || req.rejectedAt)?.toDate().toLocaleString('ja-JP')}</p>
+                          </div>
+                        </div>
+                        {isApproved && <span className="text-xs font-black text-emerald-600">+50 XP</span>}
+                      </div>
+                    );
+                  })}
+                  {(completionRequests || []).filter(req => req.status !== 'pending').length === 0 && (
+                    <p className="text-xs text-slate-400 font-bold text-center py-4">履歴はありません</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -465,6 +510,7 @@ export default function AdminLayout({
                       <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 text-left">年齢</label><input type="number" value={studentForm.age} onChange={e => setStudentForm({ ...studentForm, age: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-left" /></div>
                     </div>
                     <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 text-left">次回の授業日</label><input type="date" value={studentForm.nextClassDate} onChange={e => setStudentForm({ ...studentForm, nextClassDate: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-left" /></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 text-left">備考</label><textarea rows={2} placeholder="指導上の注意など（生徒には表示されません）" value={studentForm.remarks || ''} onChange={e => setStudentForm({ ...studentForm, remarks: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-left resize-none" /></div>
 
                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4 text-left">
                       <div className="flex justify-between items-center">
@@ -592,7 +638,7 @@ export default function AdminLayout({
                       <div className="grid grid-cols-2 gap-2 text-center">
                         <div className="bg-violet-50 rounded-xl p-2.5">
                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">レベル</p>
-                          <p className="text-xl font-black text-violet-600">Lv.{Math.floor(Math.sqrt((s.xp || 0) / 100)) + 1 > 20 ? 20 : Math.floor(Math.sqrt((s.xp || 0) / 100)) + 1}</p>
+                          <p className="text-xl font-black text-violet-600">Lv.{getLevelFromXp(s.xp || 0)}</p>
                         </div>
                         <div className="bg-indigo-50 rounded-xl p-2.5">
                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">合計XP</p>
@@ -669,7 +715,7 @@ export default function AdminLayout({
                        </div>
                        <form onSubmit={(e) => sendMessage(e, s.id, s.id)} className="flex gap-2 shrink-0">
                           <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="メッセージを入力..." className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-500" />
-                          <button type="submit" disabled={isSendingMessage} className="bg-slate-900 text-white px-4 rounded-xl font-bold text-sm tracking-wider uppercase hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">{isSendingMessage ? <Loader2 size={16} className="animate-spin" /> : '送信'}</button>
+                          <button type="submit" disabled={isSendingMessage || !newMessage.trim()} className="bg-slate-900 text-white px-4 rounded-xl font-bold text-sm tracking-wider uppercase hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">{isSendingMessage ? <Loader2 size={16} className="animate-spin" /> : '送信'}</button>
                        </form>
                     </div>
 
@@ -685,7 +731,7 @@ export default function AdminLayout({
                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black tracking-widest uppercase ${record.recordType === 'goal' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600'}`}>
                                      {record.recordType === 'goal' ? '目標シート' : '振り返りシート'}
                                    </span>
-                                   <p className="text-[10px] font-bold text-slate-400 mt-2">{new Date(record.date).toLocaleDateString()}</p>
+                                   <p className="text-[10px] font-bold text-slate-400 mt-2">{(() => { const d = record.lessonDate || record.date; return d ? new Date(d).toLocaleDateString('ja-JP') : '日付なし'; })()}</p>
                                    <h4 className="text-lg font-black text-slate-800 mt-1">{record.title}</h4>
                                  </div>
                                </div>
@@ -916,13 +962,18 @@ export default function AdminLayout({
           {activeTab === 'records' && (
             <div className="space-y-6 animate-in fade-in duration-500 text-left">
               <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-                <h2 className="text-2xl font-black tracking-tight text-left text-slate-800">生徒の提出シート一覧</h2>
+                <div>
+                  <h2 className="text-2xl font-black tracking-tight text-left text-slate-800">生徒の提出シート一覧</h2>
+                  <p className="text-sm text-slate-400 mt-1">
+                    合計 {(learningRecords || []).length}件 ／ 未コメント <span className="font-black text-amber-600">{(learningRecords || []).filter(r => !r.comment).length}件</span>
+                  </p>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   <div className="flex bg-slate-100 p-1 rounded-xl">
-                    <button onClick={() => setRecordFilter('uncommented')} className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${recordFilter === 'uncommented' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                    <button onClick={() => { setRecordFilter('uncommented'); setEditingCommentId(null); }} className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${recordFilter === 'uncommented' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
                       未コメントのみ {recordFilter === 'uncommented' && `(${(learningRecords || []).filter(r => !r.comment && (!recordStudentFilter || r.studentId === recordStudentFilter)).length})`}
                     </button>
-                    <button onClick={() => setRecordFilter('all')} className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${recordFilter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>全て表示</button>
+                    <button onClick={() => { setRecordFilter('all'); setEditingCommentId(null); }} className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${recordFilter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>全て表示</button>
                   </div>
                   <select value={recordStudentFilter} onChange={e => setRecordStudentFilter(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-orange-400 text-slate-600 appearance-none">
                     <option value="">全生徒</option>
@@ -953,7 +1004,7 @@ export default function AdminLayout({
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black tracking-widest uppercase ${record.recordType === 'goal' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600'}`}>
                               {record.recordType === 'goal' ? '目標シート' : '振り返りシート'}
                             </span>
-                            <span className="text-[10px] font-bold text-slate-400">{new Date(record.date || record.lessonDate || '').toLocaleDateString()}</span>
+                            <span className="text-[10px] font-bold text-slate-400">{(() => { const d = record.lessonDate || record.date; return d ? new Date(d).toLocaleDateString('ja-JP') : '日付なし'; })()}</span>
                             {isCommented && <span className="text-[9px] font-black bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full flex items-center gap-1"><CheckCircle2 size={10} /> コメント済み</span>}
                           </div>
                           <h4 className="text-xl font-black text-slate-800">{record.title} <span className="text-sm font-medium text-slate-400 ml-2">by {record.studentName}</span></h4>
